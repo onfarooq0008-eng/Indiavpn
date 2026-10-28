@@ -1,0 +1,28 @@
+/* India VPN – design tokens (mirrors the Figma file) */
+:root {
+  --navy-900: #050a1f;
+  --navy-800: #0b1230;
+  --navy-700: #0d1538;
+  --saffron: #ff9933;
+  --orange: #ff6a00;
+  --green: #138808;
+  --mint: #2ecc71;
+  --red: #ff6b6b;
+  --text: #ffffff;
+  --soft: #a9b1d3;
+  --muted: #8a93b8;
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-2: rgba(255, 255, 255, 0.08);
+  --line: rgba(255, 255, 255, 0.08);
+
+  --accent: var(--saffron);
+  --accent-2: var(--orange);
+  --accent-glow: rgba(255, 128, 26, 0.55);
+
+  --r-sm: 14px;
+  --r-md: 18px;
+  --r-lg: 22px;
+  --r-pill: 999px;
+
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}

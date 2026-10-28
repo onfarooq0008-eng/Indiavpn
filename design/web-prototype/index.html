@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1230">
+<title>India VPN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="stage">
+  <aside class="dev" aria-label="Screen list">
+    <h1>India VPN</h1>
+    <p>Frontend prototype. Pick a screen.</p>
+    <div id="devList"></div>
+  </aside>
+
+  <main class="phone" id="phone">
+    <div class="statusbar"><span>9:41</span><span>5G ▮▮▮</span></div>
+
+    <!-- 01 Splash -->
+    <section class="screen no-nav" id="splash" data-nav="none">
+      <div class="logo" role="img" aria-label="India VPN logo"></div>
+      <h1>India VPN</h1>
+      <p>Fast. Secure. Made for Bharat.</p>
+      <div class="loader"><i></i></div>
+      <span class="ver">v1.0.0</span>
+    </section>
+
+    <!-- 02-04 Onboarding -->
+    <section class="screen no-nav" id="onboarding" data-nav="none">
+      <button class="skip" data-go="home">Skip</button>
+      <div class="art"><div class="tile"><svg viewBox="0 0 72 72" id="obIcon" aria-hidden="true"></svg></div></div>
+      <h2 id="obTitle"></h2>
+      <p id="obText"></p>
+      <div class="dots" id="obDots"></div>
+      <button class="btn" id="obNext">Next</button>
+    </section>
+
+    <!-- 05 Home / 07 Connected -->
+    <section class="screen" id="home" data-nav="home">
+      <header class="top">
+        <div><p class="muted">Namaste</p><h1>India VPN</h1></div>
+        <button class="pill" id="planPill" data-go="premium">Upgrade</button>
+      </header>
+      <div class="status"><h2 id="statusTitle">Not connected</h2><p class="muted" id="statusSub">Your connection is not protected</p></div>
+      <div class="connect-wrap" id="connectWrap">
+        <span class="ring r3"></span><span class="ring r2"></span>
+        <button class="connect" id="connectBtn" aria-label="Connect">
+          <svg viewBox="0 0 56 56" aria-hidden="true"><path d="M17 13a20 20 0 1 0 22 0"/><path d="M28 6v22"/></svg>
+          <span class="timer" id="timer">00:00:00</span>
+        </button>
+      </div>
+      <p class="hint" id="hint">Tap to connect</p>
+
+      <button class="card server-card" data-go="servers" aria-label="Choose server">
+        <span class="flag in" id="homeFlag"></span>
+        <span class="txt"><b id="homeServer">India – Mumbai</b><span id="homeServerSub">Fastest server · 18 ms</span></span>
+        <span class="chev" id="homeChev">›</span>
+        <span class="change" id="homeChange" hidden>Change</span>
+      </button>
+
+      <div class="grid3">
+        <div class="card stat"><small>Download</small><b id="dl">0 KB/s</b></div>
+        <div class="card stat"><small>Upload</small><b id="ul">0 KB/s</b></div>
+        <div class="card stat"><small id="thirdLabel">Duration</small><b id="third">00:00:00</b></div>
+      </div>
+
+      <div class="card graph" id="graphCard" hidden><small>Live speed</small><div class="bars" id="bars"></div></div>
+
+      <div class="grid2" id="homeToggles">
+        <div class="card tcard"><b>Kill switch</b><small>Block leaks</small><button class="toggle" role="switch" aria-label="Kill switch" data-key="killSwitch"></button></div>
+        <div class="card tcard"><b>Auto connect</b><small>On app start</small><button class="toggle" role="switch" aria-label="Auto connect" data-key="autoConnect"></button></div>
+      </div>
+    </section>
+
+    <!-- 06 Servers -->
+    <section class="screen" id="servers" data-nav="servers">
+      <div class="bar"><button class="icon-btn" data-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Select server</h2><span></span></div>
+      <label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="q" type="search" placeholder="Search country or city" autocomplete="off"></label>
+      <div class="tabs" id="tabs"></div>
+      <div id="serverList"></div>
+    </section>
+
+    <!-- 08 Speed test -->
+    <section class="screen" id="speed" data-nav="speed">
+      <h2 style="text-align:center;margin-bottom:14px">Speed test</h2>
+      <p class="muted sub" id="speedServer">India – Mumbai</p>
+      <div class="gauge">
+        <svg viewBox="0 0 240 240" aria-hidden="true">
+          <defs><linearGradient id="gg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#138808"/><stop offset="1" stop-color="#ff9933"/></linearGradient></defs>
+          <circle class="track" cx="120" cy="120" r="100" stroke-dasharray="471.2 628.3"/>
+          <circle class="val" id="gval" cx="120" cy="120" r="100" stroke-dasharray="0 628.3"/>
+        </svg>
+        <div class="mid"><b id="gnum">0</b><span>Mbps</span><em id="gphase">Ready</em></div>
+      </div>
+      <div class="grid3">
+        <div class="card stat"><small>Ping</small><b id="sPing">– ms</b></div>
+        <div class="card stat"><small>Download</small><b id="sDl">–</b></div>
+        <div class="card stat"><small>Upload</small><b id="sUl">–</b></div>
+      </div>
+      <div class="card dual"><div><small>Jitter</small><b id="sJit">–</b></div><div><small>Packet loss</small><b id="sLoss">–</b></div></div>
+      <button class="btn" id="speedBtn" style="margin-top:22px">Start test</button>
+    </section>
+
+    <!-- 09 Premium -->
+    <section class="screen no-nav" id="premium" data-nav="none">
+      <button class="icon-btn" data-back aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <div class="crown"><svg viewBox="0 0 48 30"><path d="M0 26 6 4l10 10L24 0l8 14L42 4l6 22z"/></svg></div>
+      <h2>Go premium</h2>
+      <p class="lead">Unlock the full power of India VPN</p>
+      <ul class="feat"><li>No ads, unlimited bandwidth</li><li>200+ servers in 50+ countries</li><li>Connect up to 5 devices</li><li>Kill switch and split tunneling</li></ul>
+      <div id="planList"></div>
+      <button class="btn" id="planBtn" style="margin-top:6px">Continue</button>
+      <p class="fine">Cancel anytime. Secure payment through Google Play.</p>
+    </section>
+
+    <!-- 10 Settings -->
+    <section class="screen" id="settings" data-nav="settings">
+      <h1 class="page-title">Settings</h1>
+      <div class="card acct">
+        <button class="avatar" data-go="profile" aria-label="Open account" id="setAvatar">GU</button>
+        <span class="txt"><b id="setName">Guest User</b><small id="setPlan">Free plan</small></span>
+        <button class="pill" data-go="premium">Upgrade</button>
+      </div>
+      <div class="group">
+        <div class="item"><i class="ic"></i><span>Protocol</span><em>Auto</em></div>
+        <div class="item"><i class="ic"></i><span>Kill switch</span><button class="toggle" role="switch" aria-label="Kill switch" data-key="killSwitch"></button></div>
+        <div class="item"><i class="ic"></i><span>Auto connect</span><button class="toggle" role="switch" aria-label="Auto connect" data-key="autoConnect"></button></div>
+        <button class="item" data-go="split"><i class="ic"></i><span>Split tunneling</span><b class="chev">›</b></button>
+        <div class="item"><i class="ic"></i><span>Notifications</span><button class="toggle" role="switch" aria-label="Notifications" data-key="notifications"></button></div>
+      </div>
+      <div class="group">
+        <div class="item"><i class="ic"></i><span>Language</span><em>English</em></div>
+        <button class="item" data-toast="Privacy policy opens here"><i class="ic"></i><span>Privacy policy</span><b class="chev">›</b></button>
+        <button class="item" data-toast="Thanks! Rating opens in Play Store"><i class="ic"></i><span>Rate us</span><b class="chev">›</b></button>
+        <button class="item" data-toast="India VPN 1.0.0"><i class="ic"></i><span>About</span><b class="chev">›</b></button>
+      </div>
+      <p class="vnote">India VPN v1.0.0</p>
+    </section>
+
+    <!-- 11 Split tunneling -->
+    <section class="screen" id="split" data-nav="settings">
+      <div class="bar"><button class="icon-btn" data-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Split tunneling</h2><span></span></div>
+      <div class="card enable"><span class="txt"><b>Enable split tunneling</b><small>Selected apps skip the VPN</small></span><button class="toggle" role="switch" aria-label="Enable split tunneling" data-key="splitEnabled"></button></div>
+      <p class="section">Apps that skip the VPN</p>
+      <div id="appList"></div>
+    </section>
+
+    <!-- 12 Profile -->
+    <section class="screen no-nav" id="profile" data-nav="none">
+      <div class="bar"><button class="icon-btn" data-back aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h2>My account</h2><span></span></div>
+      <div class="profile-top"><div class="avatar" id="pAvatar">GU</div><h2 id="pName">Guest User</h2><p id="pPlan">Free plan</p></div>
+      <div class="grid3">
+        <div class="card stat"><small>Data used</small><b id="pData">–</b></div>
+        <div class="card stat"><small>Sessions</small><b id="pSess">–</b></div>
+        <div class="card stat"><small>Devices</small><b id="pDev">–</b></div>
+      </div>
+      <button class="banner" data-go="premium"><span class="txt"><b>Upgrade to premium</b><small>Unlimited speed, 5 devices, no ads</small></span><span class="chev">›</span></button>
+      <p class="section">Connected devices</p>
+      <div id="devices"></div>
+      <button class="logout" data-toast="Signed out (demo)">Log out</button>
+    </section>
+
+    <nav class="nav" id="nav" aria-label="Main"></nav>
+    <div class="toast" id="toast" role="status"></div>
+  </main>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

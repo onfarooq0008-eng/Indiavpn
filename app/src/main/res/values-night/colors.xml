@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- India VPN palette (dark): the navy / saffron / green design from the Figma file. -->
+<resources>
+    <color name="primary">#FF9933</color>
+    <color name="primaryDark">#0D1538</color>
+    <color name="accent">#2ECC71</color>
+    <color name="background">#0B1230</color>
+    <color name="backgroundMid">#080E26</color>
+    <color name="backgroundEnd">#050A1F</color>
+    <color name="cardBackgroundEnd">#0D1538</color>
+    <color name="iconCircleEnd">#222E63</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#FFFFFF</color>
+    <color name="gray">#8A93B8</color>
+    <color name="cardBackground">#111A40</color>
+    <color name="rowBackground">#121C42</color>
+    <color name="searchBorder">#26305F</color>
+    <color name="searchBackground">#111A40</color>
+    <color name="statusOnline">#2ECC71</color>
+    <color name="statusOffline">#FF6B6B</color>
+    <color name="statusWarn">#FFB800</color>
+    <color name="heroStart">#1A2150</color>
+    <color name="iconCircle">#1B2552</color>
+    <color name="onlinePill">#12301F</color>
+    <color name="connectedTint">#0B2A24</color>
+    <color name="divider">#1C2757</color>
+    <color name="mutedOnPrimary">#C9D0F0</color>
+    <color name="launcherIconBg">#0B1230</color>
+    <color name="ringCyan">#FFB347</color>
+    <color name="ringGreen">#2ECC71</color>
+    <color name="ringBlue">#FF6A00</color>
+    <color name="gold">#FFB800</color>
+    <color name="textPrimary">#FFFFFF</color>
+    <color name="ringMuted">#8A93B8</color>
+    <color name="signalOff">#2A3568</color>
+</resources>

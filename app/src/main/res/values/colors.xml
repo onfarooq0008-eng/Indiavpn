@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- India VPN palette (light): warm white surfaces, saffron primary, India-green accent.
+     Token names are unchanged from the old theme so every layout/drawable keeps working.
+     ringCyan/ringBlue are now the saffron gradient pair (names kept to avoid touching code). -->
+<resources>
+    <color name="primary">#E8710A</color>
+    <color name="primaryDark">#9A4A00</color>
+    <color name="accent">#138808</color>
+    <color name="background">#FFF9F2</color>
+    <color name="backgroundMid">#FFF3E6</color>
+    <color name="backgroundEnd">#FFEBD6</color>
+    <color name="cardBackgroundEnd">#FFF8F0</color>
+    <color name="iconCircleEnd">#FFE2C2</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#152033</color>
+    <color name="textPrimary">#152033</color>
+    <color name="gray">#5F6B85</color>
+    <color name="cardBackground">#FFFFFF</color>
+    <color name="rowBackground">#FFF6EC</color>
+    <color name="searchBorder">#EFD9C0</color>
+    <color name="searchBackground">#FFFFFF</color>
+    <color name="statusOnline">#138808</color>
+    <color name="statusOffline">#D64545</color>
+    <color name="statusWarn">#D99A00</color>
+    <color name="heroStart">#1A2150</color>
+    <color name="iconCircle">#FFEBD6</color>
+    <color name="onlinePill">#E4F7EE</color>
+    <color name="connectedTint">#E3F6EC</color>
+    <color name="divider">#F0E0CC</color>
+    <color name="mutedOnPrimary">#C9D0F0</color>
+    <color name="launcherIconBg">#0B1230</color>
+    <color name="ringCyan">#FFB347</color>
+    <color name="ringGreen">#1FA855</color>
+    <color name="ringBlue">#FF6A00</color>
+    <color name="ringMuted">#8A93B8</color>
+    <color name="gold">#F5A300</color>
+    <color name="signalOff">#E3D3BF</color>
+</resources>

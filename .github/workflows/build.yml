@@ -1,0 +1,239 @@
+name: Build India VPN (debug APK, signed APK, signed AAB)
+
+# What runs when:
+#   pull request            -> tests + debug APK
+#   push to main / master   -> tests + debug APK + signed release APK + signed AAB (if signing secrets exist)
+#   tag v*  (e.g. v1.0.6)   -> same as above, but missing signing secrets FAIL the run, and a GitHub Release is created
+#   "Run workflow" button   -> same as push; tick/untick "build_release"
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request: {}
+  workflow_dispatch:
+    inputs:
+      build_release:
+        description: 'Also build the signed release APK + AAB'
+        type: boolean
+        default: true
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Pinned: known to work with AGP 9.0.1 + Kotlin 2.4.0 (see build.gradle). Bump them together.
+  GRADLE_VERSION: '9.1.0'
+
+jobs:
+  # ------------------------------------------------------------------ tests
+  test:
+    name: Tests (backend + Android unit tests)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Backend tests
+        working-directory: backend/api
+        run: npm test
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Accept Android SDK licenses
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -name sdkmanager | sort -V | tail -1)"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+      - name: Android unit tests
+        run: gradle testDebugUnitTest
+      - name: Upload test report (only on failure)
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-results
+          path: app/build/reports/tests/testDebugUnitTest/
+
+  # ------------------------------------------------------------- debug APK
+  debug:
+    name: Debug APK
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Accept Android SDK licenses
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -name sdkmanager | sort -V | tail -1)"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+      - name: Build debug APK
+        run: gradle assembleDebug -PappVersionCode=${{ github.run_number }}
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: IndiaVPN-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+  # ------------------------------------------- signed release APK + AAB
+  release:
+    name: Signed release APK + AAB
+    needs: test
+    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.build_release) }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # only needed to attach files to a GitHub Release on tag builds
+    steps:
+      - uses: actions/checkout@v6
+
+      # Secrets cannot be used in `if:` directly, so check them once here and reuse the result.
+      - name: Check signing secrets
+        id: sign
+        env:
+          KS: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          SP: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          KA: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KP: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KS" ] && [ -n "$SP" ] && [ -n "$KA" ] && [ -n "$KP" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "::error::Release tag build needs all four secrets: RELEASE_KEYSTORE_BASE64, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD (see INDIA_VPN_GUIDE.md)."
+            exit 1
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Signing secrets are not set - skipping the signed APK/AAB. Add them in Settings > Secrets and variables > Actions (see INDIA_VPN_GUIDE.md)."
+          fi
+
+      - if: steps.sign.outputs.ok == 'true'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - if: steps.sign.outputs.ok == 'true'
+        name: Accept Android SDK licenses
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -name sdkmanager | sort -V | tail -1)"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+      - if: steps.sign.outputs.ok == 'true'
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+
+      - name: Work out version
+        if: steps.sign.outputs.ok == 'true'
+        id: ver
+        env:
+          # Optional repo variable (Settings > Secrets and variables > Actions > Variables).
+          # versionCode = base + run number, so every Play upload is higher than the last one.
+          VERSION_CODE_BASE: ${{ vars.VERSION_CODE_BASE }}
+        run: |
+          CODE=$(( ${VERSION_CODE_BASE:-100} + GITHUB_RUN_NUMBER ))
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            NAME="${GITHUB_REF_NAME#v}"
+          else
+            NAME="$(sed -n "s/.*findProperty('appVersionName') ?: '\([^']*\)'.*/\1/p" app/build.gradle | head -1)-build${GITHUB_RUN_NUMBER}"
+          fi
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Version: $NAME ($CODE)"
+
+      - name: Decode keystore
+        if: steps.sign.outputs.ok == 'true'
+        env:
+          KS: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          SP: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          KA: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KP: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          echo "$KS" | base64 -d > "$RUNNER_TEMP/india-vpn-release.jks"
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$RUNNER_TEMP/india-vpn-release.jks" "$SP" "$KA" "$KP" > keystore.properties
+
+      - name: Build signed release APK and AAB
+        if: steps.sign.outputs.ok == 'true'
+        run: >
+          gradle assembleRelease bundleRelease
+          -PappVersionCode=${{ steps.ver.outputs.code }}
+          -PappVersionName=${{ steps.ver.outputs.name }}
+
+      - name: Verify signatures
+        if: steps.sign.outputs.ok == 'true'
+        run: |
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)"
+          APK=app/build/outputs/apk/release/app-release.apk
+          AAB=app/build/outputs/bundle/release/app-release.aab
+          test -f "$APK" || { echo "::error::$APK not found (unsigned build?)"; ls -R app/build/outputs/apk; exit 1; }
+          test -f "$AAB" || { echo "::error::$AAB not found"; exit 1; }
+
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee apk-cert.txt
+          if grep -qi "Android Debug" apk-cert.txt; then echo "::error::Release APK is signed with the debug key"; exit 1; fi
+
+          jarsigner -verify "$AAB" | tee aab-cert.txt
+          grep -q "jar verified" aab-cert.txt || { echo "::error::AAB is not signed"; exit 1; }
+
+          {
+            echo "### Signed build ${{ steps.ver.outputs.name }} (versionCode ${{ steps.ver.outputs.code }})"
+            echo '```'
+            grep -E "Signer #1 certificate (DN|SHA-256)" apk-cert.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect files
+        if: steps.sign.outputs.ok == 'true'
+        run: |
+          mkdir dist
+          V="${{ steps.ver.outputs.name }}"
+          cp app/build/outputs/apk/release/app-release.apk "dist/IndiaVPN-$V.apk"
+          cp app/build/outputs/bundle/release/app-release.aab "dist/IndiaVPN-$V.aab"
+          (cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Upload signed APK
+        if: steps.sign.outputs.ok == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: IndiaVPN-release-apk-signed
+          path: dist/*.apk
+          if-no-files-found: error
+      - name: Upload signed AAB (for Play Console)
+        if: steps.sign.outputs.ok == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: IndiaVPN-release-aab-signed
+          path: dist/*.aab
+          if-no-files-found: error
+      - name: Upload R8 mapping + native symbols (crash deobfuscation)
+        if: steps.sign.outputs.ok == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: IndiaVPN-release-symbols
+          path: |
+            app/build/outputs/mapping/release/mapping.txt
+            app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip
+          if-no-files-found: ignore
+
+      - name: Publish GitHub Release (tags only)
+        if: steps.sign.outputs.ok == 'true' && startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+
+      - name: Remove keystore from runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/india-vpn-release.jks" keystore.properties
