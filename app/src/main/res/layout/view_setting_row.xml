@@ -8,32 +8,30 @@
     android:clickable="true"
     android:focusable="true"
     android:gravity="center_vertical"
-    android:minHeight="64dp"
+    android:minHeight="56dp"
     android:orientation="horizontal"
     android:paddingHorizontal="16dp"
-    android:paddingVertical="10dp">
+    android:paddingVertical="8dp">
 
     <ImageView
         android:id="@+id/rowIcon"
-        android:layout_width="38dp"
-        android:layout_height="38dp"
-        android:background="@drawable/bg_icon_circle"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
         android:importantForAccessibility="no"
-        android:padding="9dp"
         app:tint="@color/textPrimary" />
 
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_marginStart="14dp"
+        android:layout_marginStart="16dp"
         android:orientation="vertical">
         <TextView
             android:id="@+id/rowTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="@color/textPrimary"
-            android:textSize="16sp"
+            android:textSize="15sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/rowSubtitle"
@@ -44,6 +42,18 @@
             android:textSize="12sp" />
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/rowValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:maxWidth="150dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/gray"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
     <com.google.android.material.switchmaterial.SwitchMaterial
         android:id="@+id/rowSwitch"
         android:layout_width="wrap_content"
@@ -52,8 +62,9 @@
 
     <ImageView
         android:id="@+id/rowChevron"
-        android:layout_width="22dp"
-        android:layout_height="22dp"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginStart="4dp"
         android:importantForAccessibility="no"
         android:src="@drawable/ic_chevron_right"
         app:tint="@color/gray" />

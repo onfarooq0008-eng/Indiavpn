@@ -153,13 +153,14 @@ class HomeListAdapter(
             } else {
                 "${group.servers.size} servers " + if (row.expanded) "▴" else "▾"
             }
-            if (bestPing == -2) {
-                b.textServerCount.text = "$base • Offline"
-                b.textServerCount.setTextColor(ContextCompat.getColor(ctx, R.color.statusOffline))
-            } else {
-                b.textServerCount.text = base
-                b.textServerCount.setTextColor(ContextCompat.getColor(ctx, R.color.gray))
+            b.textServerCount.text = base
+            b.textServerCount.setTextColor(ContextCompat.getColor(ctx, R.color.gray))
+            b.textPing.text = when {
+                bestPing == -2 -> "Offline"
+                bestPing >= 0 -> "$bestPing ms"
+                else -> "…"
             }
+            b.textPing.setTextColor(ContextCompat.getColor(ctx, SignalBarsView.colorForPing(bestPing)))
 
             b.signal.level = SignalBarsView.levelForPing(bestPing)
             b.signal.contentDescription = if (bestPing >= 0) "$bestPing ms" else "No signal"

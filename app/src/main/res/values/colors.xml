@@ -1,38 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- India VPN palette (light): warm white surfaces, saffron primary, India-green accent.
-     Token names are unchanged from the old theme so every layout/drawable keeps working.
-     ringCyan/ringBlue are now the saffron gradient pair (names kept to avoid touching code). -->
+<!-- India VPN palette (light): blue hero, white cards. Token names kept from the old theme. -->
 <resources>
-    <color name="primary">#E8710A</color>
-    <color name="primaryDark">#9A4A00</color>
-    <color name="accent">#138808</color>
-    <color name="background">#FFF9F2</color>
-    <color name="backgroundMid">#FFF3E6</color>
-    <color name="backgroundEnd">#FFEBD6</color>
-    <color name="cardBackgroundEnd">#FFF8F0</color>
-    <color name="iconCircleEnd">#FFE2C2</color>
+    <color name="primary">#1565F5</color>
+    <color name="primaryDark">#0B3FB0</color>
+    <color name="accent">#19B25B</color>
+    <color name="background">#F4F7FD</color>
+    <color name="backgroundMid">#F4F7FD</color>
+    <color name="backgroundEnd">#EEF3FC</color>
+    <color name="cardBackgroundEnd">#FFFFFF</color>
+    <color name="iconCircleEnd">#DCE8FD</color>
     <color name="white">#FFFFFF</color>
-    <color name="black">#152033</color>
-    <color name="textPrimary">#152033</color>
-    <color name="gray">#5F6B85</color>
+    <color name="black">#0F1B3D</color>
+    <color name="textPrimary">#0F1B3D</color>
+    <color name="gray">#6B7A99</color>
     <color name="cardBackground">#FFFFFF</color>
-    <color name="rowBackground">#FFF6EC</color>
-    <color name="searchBorder">#EFD9C0</color>
-    <color name="searchBackground">#FFFFFF</color>
-    <color name="statusOnline">#138808</color>
-    <color name="statusOffline">#D64545</color>
-    <color name="statusWarn">#D99A00</color>
-    <color name="heroStart">#1A2150</color>
-    <color name="iconCircle">#FFEBD6</color>
+    <color name="rowBackground">#F7F9FE</color>
+    <color name="searchBorder">#E3EAF5</color>
+    <color name="searchBackground">#EBF0F9</color>
+    <color name="statusOnline">#19B25B</color>
+    <color name="statusOffline">#E5484D</color>
+    <color name="statusWarn">#F59E0B</color>
+    <color name="heroStart">#1E6CF2</color>
+    <color name="iconCircle">#EAF1FE</color>
     <color name="onlinePill">#E4F7EE</color>
-    <color name="connectedTint">#E3F6EC</color>
-    <color name="divider">#F0E0CC</color>
-    <color name="mutedOnPrimary">#C9D0F0</color>
-    <color name="launcherIconBg">#0B1230</color>
-    <color name="ringCyan">#FFB347</color>
-    <color name="ringGreen">#1FA855</color>
-    <color name="ringBlue">#FF6A00</color>
+    <color name="connectedTint">#E8F8EF</color>
+    <color name="divider">#E6ECF6</color>
+    <color name="mutedOnPrimary">#D6E4FF</color>
+    <color name="launcherIconBg">#0B4FD0</color>
+    <color name="ringCyan">#2BD9A4</color>
+    <color name="ringGreen">#19B25B</color>
+    <color name="ringBlue">#1565F5</color>
     <color name="ringMuted">#8A93B8</color>
     <color name="gold">#F5A300</color>
-    <color name="signalOff">#E3D3BF</color>
+    <color name="signalOff">#D5DEEE</color>
+    <color name="heroBlueTop">#1F6FF5</color>
+    <color name="heroBlueBottom">#0A3FB8</color>
+    <color name="heroGreenTop">#10A064</color>
+    <color name="heroGreenBottom">#064E3B</color>
+    <color name="splashTop">#1565F5</color>
+    <color name="splashBottom">#0A3AA8</color>
+    <color name="skyline">#0A3590</color>
+    <color name="statBlueBg">#EEF4FF</color>
+    <color name="statGreenBg">#EAFBF1</color>
+    <color name="statPurpleBg">#F3EEFF</color>
+    <color name="statPurple">#8B5CF6</color>
 </resources>

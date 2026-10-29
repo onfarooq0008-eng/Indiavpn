@@ -16,6 +16,9 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.GravityCompat
+import androidx.core.view.WindowCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -26,6 +29,7 @@ import com.indiavpn.fast.R
 import com.indiavpn.fast.ads.AdsManager
 import com.indiavpn.fast.ads.NativeAdSlot
 import com.indiavpn.fast.data.AppSettings
+import com.indiavpn.fast.data.BackendApiClient
 import com.indiavpn.fast.data.Server
 import com.indiavpn.fast.data.ServerCache
 import com.indiavpn.fast.data.ServerSource
@@ -33,6 +37,7 @@ import com.indiavpn.fast.databinding.ActivityMainBinding
 import com.indiavpn.fast.util.ConnectivityCheckUtil
 import com.indiavpn.fast.util.NotificationHelper
 import com.indiavpn.fast.util.PingUtil
+import com.indiavpn.fast.util.SpeedTest
 import com.indiavpn.fast.util.ThemeUtil
 import com.indiavpn.fast.util.SecureKeyStore
 import com.indiavpn.fast.vpn.TunnelState
@@ -54,9 +59,10 @@ import java.util.Locale
 import com.indiavpn.fast.util.applyEdgeToEdgeInsets
 
 /**
- * Main screen with two tabs behind a bottom navigation bar: Home (power button, current
- * location) and Locations (servers grouped by country; tap a country with 2+ servers to
- * expand it inline). Settings opens as its own screen. Talks to your control API
+ * Main screen with three panes behind a bottom navigation bar: Home (power button, current
+ * server, IP / location), Servers (grouped by country; tap a country with 2+ servers to
+ * expand it inline) and Speed Test. A side menu (hamburger) mirrors them and adds Help and
+ * About. Settings opens as its own screen. Talks to your control API
  * automatically via the built-in Backend API URL -- see ServerSource /
  * BackendApiClient.
  */
@@ -95,9 +101,15 @@ class MainActivity : AppCompatActivity() {
     private var connectingServer: Server? = null
     // False until the first server load has finished, so an empty list reads "Loading…" not "No locations".
     private var initialLoadDone = false
+    private var speedJob: Job? = null
+    // Public IP shown on Home while connected: null = not looked up yet, "" = lookup failed.
+    private var publicIp: String? = null
+    private var ipJob: Job? = null
+    private var chromeBg = 0
+    private lateinit var drawerBackCallback: OnBackPressedCallback
 
-    private enum class Tab { HOME, LOCATIONS }
-    private enum class LocationFilter { ALL, STREAMING, FAVORITES }
+    private enum class Tab { HOME, LOCATIONS, SPEED }
+    private enum class LocationFilter { ALL, RECOMMENDED, FAVORITES }
     private enum class UiState { DISCONNECTED, CONNECTING, CONNECTED }
 
     private var currentTab = Tab.HOME
@@ -126,7 +138,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        applyEdgeToEdgeInsets(binding.root)
+        applyEdgeToEdgeInsets(binding.contentRoot)
 
         serverSource = ServerSource(this)
         appSettings = AppSettings(this)
@@ -166,14 +178,15 @@ class MainActivity : AppCompatActivity() {
         // Pull-to-refresh is the user explicitly asking for new data: skip the 24h cache.
         binding.swipeRefresh.setOnRefreshListener { loadAndPing(forceRefresh = true) }
         binding.powerButton.setOnClickListener { onActionButtonTapped() }
+        binding.buttonDisconnect.setOnClickListener { onActionButtonTapped() }
         binding.chronometerConnected.setOnChronometerTickListener { c ->
             c.text = formatElapsed(SystemClock.elapsedRealtime() - c.base)
         }
 
         setUpNavigation()
         setUpPremiumEntryPoints()
-        ThemeUtil.bind(binding.buttonTheme)
-        ThemeUtil.bind(binding.buttonThemeLocations)
+        setUpDrawer()
+        setUpSpeedTest()
 
         binding.editSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -185,12 +198,12 @@ class MainActivity : AppCompatActivity() {
         })
 
         binding.tabAll.setOnClickListener { setFilter(LocationFilter.ALL) }
-        binding.tabStreaming.setOnClickListener { setFilter(LocationFilter.STREAMING) }
+        binding.tabStreaming.setOnClickListener { setFilter(LocationFilter.RECOMMENDED) }
         binding.tabFavorites.setOnClickListener { setFilter(LocationFilter.FAVORITES) }
         updateTabs()
         // After a theme switch the activity is recreated: restore the tab and don't auto-connect again.
         showTab(
-            if (savedInstanceState != null) Tab.values()[savedInstanceState.getInt(STATE_TAB, 0).coerceIn(0, 1)]
+            if (savedInstanceState != null) Tab.values()[savedInstanceState.getInt(STATE_TAB, 0).coerceIn(0, Tab.values().size - 1)]
             else tabFromIntent(intent)
         )
 
@@ -242,8 +255,11 @@ class MainActivity : AppCompatActivity() {
         outState.putInt(STATE_TAB, currentTab.ordinal)
     }
 
-    private fun tabFromIntent(intent: Intent?): Tab =
-        if (intent?.getIntExtra(EXTRA_TAB, TAB_HOME) == TAB_LOCATIONS) Tab.LOCATIONS else Tab.HOME
+    private fun tabFromIntent(intent: Intent?): Tab = when (intent?.getIntExtra(EXTRA_TAB, TAB_HOME)) {
+        TAB_LOCATIONS -> Tab.LOCATIONS
+        TAB_SPEED -> Tab.SPEED
+        else -> Tab.HOME
+    }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -257,13 +273,13 @@ class MainActivity : AppCompatActivity() {
             when (item.itemId) {
                 R.id.nav_home -> { showTab(Tab.HOME); true }
                 R.id.nav_locations -> { showTab(Tab.LOCATIONS); true }
+                R.id.nav_speed -> { showTab(Tab.SPEED); true }
                 else -> { openSettings(); false } // keep the current tab highlighted
             }
         }
-        binding.buttonMenu.setOnClickListener { openSettings() }
+        binding.buttonMenu.setOnClickListener { binding.drawerLayout.openDrawer(GravityCompat.START) }
         binding.buttonLocationsBack.setOnClickListener { showTab(Tab.HOME) }
         binding.cardCurrentLocation.setOnClickListener { showTab(Tab.LOCATIONS) }
-        binding.cardProtection.setOnClickListener { showTab(Tab.LOCATIONS) }
 
         locationsBackCallback = object : OnBackPressedCallback(false) {
             override fun handleOnBackPressed() = showTab(Tab.HOME)
@@ -288,18 +304,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun showTab(tab: Tab) {
         currentTab = tab
-        val home = tab == Tab.HOME
-        binding.paneHome.visibility = if (home) View.VISIBLE else View.GONE
-        binding.paneLocations.visibility = if (home) View.GONE else View.VISIBLE
-        locationsBackCallback.isEnabled = !home
+        binding.paneHome.visibility = if (tab == Tab.HOME) View.VISIBLE else View.GONE
+        binding.paneLocations.visibility = if (tab == Tab.LOCATIONS) View.VISIBLE else View.GONE
+        binding.paneSpeed.visibility = if (tab == Tab.SPEED) View.VISIBLE else View.GONE
+        locationsBackCallback.isEnabled = tab != Tab.HOME
         suppressNav = true
-        binding.bottomNav.selectedItemId = if (home) R.id.nav_home else R.id.nav_locations
+        binding.bottomNav.selectedItemId = when (tab) {
+            Tab.HOME -> R.id.nav_home
+            Tab.LOCATIONS -> R.id.nav_locations
+            Tab.SPEED -> R.id.nav_speed
+        }
         suppressNav = false
+        applyChrome()
         currentFocus?.let {
             (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(it.windowToken, 0)
         }
-        // Opening Locations after a while on Home: bring the ping times up to date right away.
-        if (!home && initialLoadDone && SystemClock.elapsedRealtime() - lastPingAt > SERVER_REFRESH_INTERVAL_MS) {
+        // Opening Servers after a while on Home: bring the ping times up to date right away.
+        if (tab == Tab.LOCATIONS && initialLoadDone && SystemClock.elapsedRealtime() - lastPingAt > SERVER_REFRESH_INTERVAL_MS) {
             lifecycleScope.launch { refreshServers(showSpinner = false) }
         }
     }
@@ -312,7 +333,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateTabs() {
         binding.tabAll.isSelected = locationFilter == LocationFilter.ALL
-        binding.tabStreaming.isSelected = locationFilter == LocationFilter.STREAMING
+        binding.tabStreaming.isSelected = locationFilter == LocationFilter.RECOMMENDED
         binding.tabFavorites.isSelected = locationFilter == LocationFilter.FAVORITES
     }
 
@@ -336,6 +357,8 @@ class MainActivity : AppCompatActivity() {
         AdsManager.hideBanner(binding.adContainer)
         nativeHome.destroy()
         nativeLocations.destroy()
+        speedJob?.cancel()
+        ipJob?.cancel()
     }
 
     override fun onPause() {
@@ -560,17 +583,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderRows() {
-        val hasStreaming = allServers.any { it.streaming }
-        binding.tabStreaming.visibility = if (hasStreaming) View.VISIBLE else View.GONE
-        if (!hasStreaming && locationFilter == LocationFilter.STREAMING) {
-            locationFilter = LocationFilter.ALL
-            updateTabs()
-        }
-
         val favorites = appSettings.favoriteCountries
         val byTab = when (locationFilter) {
             LocationFilter.ALL -> allServers
-            LocationFilter.STREAMING -> allServers.filter { it.streaming }
+            LocationFilter.RECOMMENDED -> recommendedServers()
             LocationFilter.FAVORITES -> allServers.filter { favorites.contains(it.countryCode) }
         }
         val query = searchQuery.trim().lowercase()
@@ -616,9 +632,9 @@ class MainActivity : AppCompatActivity() {
                         binding.textEmptyTitle.text = "No favorites yet"
                         binding.textEmptyBody.text = "Tap the star next to a country to add it here."
                     }
-                    query.isEmpty() && locationFilter == LocationFilter.STREAMING -> {
-                        binding.textEmptyTitle.text = "No streaming locations"
-                        binding.textEmptyBody.text = "Pull down to refresh your server list."
+                    query.isEmpty() && locationFilter == LocationFilter.RECOMMENDED -> {
+                        binding.textEmptyTitle.text = "No recommended locations yet"
+                        binding.textEmptyBody.text = "Servers show up here once they have been checked. Pull down to refresh."
                     }
                     else -> {
                         binding.textEmptyTitle.text = "No locations found"
@@ -1007,56 +1023,90 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateStatusCard() {
         if (!connectionFlowActive && tunnelManager.state != TunnelState.CONNECTING) connectingServer = null
-        val green = ContextCompat.getColor(this, R.color.statusOnline)
-        val red = ContextCompat.getColor(this, R.color.statusOffline)
-        val gray = ContextCompat.getColor(this, R.color.gray)
-        val ringMuted = ContextCompat.getColor(this, R.color.ringMuted)
         val white = ContextCompat.getColor(this, R.color.white)
-        val blue = ContextCompat.getColor(this, R.color.primary)
-        // The status card takes on the connection colour so the state reads at a glance.
-        when (uiState()) {
-            UiState.CONNECTED -> {
-                binding.cardProtection.setCardBackgroundColor(ContextCompat.getColor(this, R.color.connectedTint))
-                binding.cardProtection.strokeColor = green
-            }
-            else -> {
-                binding.cardProtection.setCardBackgroundColor(ContextCompat.getColor(this, R.color.cardBackground))
-                binding.cardProtection.strokeColor = ContextCompat.getColor(this, R.color.divider)
-            }
-        }
         when (uiState()) {
             UiState.CONNECTED -> {
                 binding.ringView.ringState = PowerRingView.State.CONNECTED
-                binding.textRingStatus.text = "CONNECTED"
-                binding.textRingStatus.setTextColor(green)
+                binding.imagePower.setImageResource(R.drawable.ic_shield_check)
                 binding.imagePower.imageTintList = ColorStateList.valueOf(white)
-                binding.textProtected.text = "You're Protected"
-                binding.textProtected.setTextColor(green)
-                binding.imageProtected.setImageResource(R.drawable.ic_shield_check)
-                binding.imageProtected.imageTintList = ColorStateList.valueOf(green)
+                binding.textRingStatus.text = "Connected"
+                binding.textProtected.text = "Your online privacy is protected"
+                binding.buttonDisconnect.visibility = View.VISIBLE
             }
             UiState.CONNECTING -> {
                 binding.ringView.ringState = PowerRingView.State.CONNECTING
-                binding.textRingStatus.text = "CONNECTING…"
-                binding.textRingStatus.setTextColor(blue)
-                binding.imagePower.imageTintList = ColorStateList.valueOf(blue)
+                binding.imagePower.setImageResource(R.drawable.ic_power)
+                binding.imagePower.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.ringBlue))
+                binding.textRingStatus.text = "Connecting…"
                 binding.textProtected.text = "Securing your connection…"
-                binding.textProtected.setTextColor(gray)
-                binding.imageProtected.setImageResource(R.drawable.ic_shield_off)
-                binding.imageProtected.imageTintList = ColorStateList.valueOf(gray)
+                binding.buttonDisconnect.visibility = View.GONE
             }
             UiState.DISCONNECTED -> {
                 binding.ringView.ringState = PowerRingView.State.DISCONNECTED
-                binding.textRingStatus.text = "TAP TO CONNECT"
-                binding.textRingStatus.setTextColor(ringMuted)
-                binding.imagePower.imageTintList = ColorStateList.valueOf(ringMuted)
-                binding.textProtected.text = "You're Not Protected"
-                binding.textProtected.setTextColor(red)
-                binding.imageProtected.setImageResource(R.drawable.ic_shield_off)
-                binding.imageProtected.imageTintList = ColorStateList.valueOf(red)
+                binding.imagePower.setImageResource(R.drawable.ic_power)
+                binding.imagePower.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.ringGreen))
+                binding.textRingStatus.text = "Tap to Connect"
+                binding.textProtected.text = "Your online privacy is not protected"
+                binding.buttonDisconnect.visibility = View.GONE
             }
         }
+        applyChrome()
         updateCurrentLocation()
+        updateIpInfo()
+    }
+
+    /** Background and status-bar icons follow the screen: blue (green while connected) hero on Home,
+     *  plain light/dark surface elsewhere. Also highlights the current screen in the side menu. */
+    private fun applyChrome() {
+        val hero = currentTab == Tab.HOME
+        val bg = when {
+            hero && uiState() == UiState.CONNECTED -> R.drawable.bg_hero_green
+            hero -> R.drawable.bg_hero_blue
+            else -> R.drawable.bg_app
+        }
+        if (bg != chromeBg) {
+            chromeBg = bg
+            binding.contentRoot.setBackgroundResource(bg)
+        }
+        WindowCompat.getInsetsController(window, binding.root).isAppearanceLightStatusBars =
+            !hero && !ThemeUtil.isNight(this)
+        val selected = R.drawable.bg_drawer_selected
+        binding.drawerHome.setBackgroundResource(if (currentTab == Tab.HOME) selected else 0)
+        binding.drawerServers.setBackgroundResource(if (currentTab == Tab.LOCATIONS) selected else 0)
+        binding.drawerSpeed.setBackgroundResource(if (currentTab == Tab.SPEED) selected else 0)
+    }
+
+    /** "IP Address" / "Location" card on Home. The IP comes from our own backend (/api/myip), asked
+     *  through the tunnel, so it is the server's exit address. Looked up once per connection. */
+    private fun updateIpInfo() {
+        if (uiState() != UiState.CONNECTED) {
+            ipJob?.cancel()
+            ipJob = null
+            publicIp = null
+            binding.textIpAddress.text = "Not connected"
+            binding.textLocation.text = "Not connected"
+            return
+        }
+        val server = connectedServer ?: currentServer()
+        binding.textLocation.text = server?.let { it.countryName.ifBlank { it.name } } ?: "Unknown"
+        val ip = publicIp
+        if (ip != null) {
+            binding.textIpAddress.text = ip.ifBlank { "Unavailable" }
+            return
+        }
+        if (ipJob?.isActive == true) return
+        binding.textIpAddress.text = "Checking…"
+        ipJob = lifecycleScope.launch {
+            val result = try {
+                BackendApiClient().fetchMyIp(appSettings.backendApiUrl)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ""
+            }
+            publicIp = result
+            binding.textIpAddress.text = result.ifBlank { "Unavailable" }
+        }
     }
 
     private fun currentServer(): Server? =
@@ -1081,11 +1131,22 @@ class MainActivity : AppCompatActivity() {
             binding.textCurrentCity.text = server.city.ifBlank { server.name }
             binding.signalCurrent.level = SignalBarsView.levelForPing(server.pingMs)
         }
+        updateSpeedServerLabel()
+    }
+
+    private fun updateSpeedServerLabel() {
+        val server = currentServer()
+        binding.textSpeedServer.text = when {
+            server == null -> "Fastest server (auto)"
+            server.city.isBlank() -> server.countryName.ifBlank { server.name }
+            else -> "${server.countryName.ifBlank { server.name }} (${server.city})"
+        }
     }
 
     private fun updateActionButton() {
         val busy = uiState() == UiState.CONNECTING || disconnectInProgress
         binding.powerButton.isEnabled = !busy
+        binding.buttonDisconnect.isEnabled = !busy
         binding.powerButton.contentDescription =
             if (tunnelManager.state == TunnelState.UP) "Disconnect" else "Connect"
         updateStatusCard()
@@ -1148,6 +1209,108 @@ class MainActivity : AppCompatActivity() {
         return "%.2f GB".format(gb)
     }
 
+    /** Servers shown in the Recommended tab: streaming-ready ones plus the six fastest by ping. */
+    private fun recommendedServers(): List<Server> {
+        val streaming = allServers.filter { it.enabled && it.streaming }
+        val fastest = allServers.filter { it.enabled && it.pingMs >= 0 }.sortedBy { it.pingMs }.take(6)
+        return (streaming + fastest).distinctBy { it.id }
+    }
+
+    // ---- side menu --------------------------------------------------------------------------------
+
+    private fun setUpDrawer() {
+        val close = { binding.drawerLayout.closeDrawer(GravityCompat.START) }
+        binding.drawerHome.setOnClickListener { close(); showTab(Tab.HOME) }
+        binding.drawerServers.setOnClickListener { close(); showTab(Tab.LOCATIONS) }
+        binding.drawerSpeed.setOnClickListener { close(); showTab(Tab.SPEED) }
+        binding.drawerSettings.setOnClickListener { close(); openSettings() }
+        binding.drawerHelp.setOnClickListener { close(); openSupportEmail() }
+        binding.drawerAbout.setOnClickListener { close(); showAbout() }
+
+        // Back closes an open menu first (this callback is added after the tab one, so it wins).
+        drawerBackCallback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                binding.drawerLayout.closeDrawer(GravityCompat.START)
+            }
+        }
+        onBackPressedDispatcher.addCallback(this, drawerBackCallback)
+        binding.drawerLayout.addDrawerListener(object : DrawerLayout.SimpleDrawerListener() {
+            override fun onDrawerOpened(drawerView: View) { drawerBackCallback.isEnabled = true }
+            override fun onDrawerClosed(drawerView: View) { drawerBackCallback.isEnabled = false }
+        })
+    }
+
+    private fun openSupportEmail() {
+        val email = getString(R.string.contact_email)
+        val intent = Intent(Intent.ACTION_SENDTO).apply {
+            data = android.net.Uri.parse("mailto:")
+            putExtra(Intent.EXTRA_EMAIL, arrayOf(email))
+            putExtra(Intent.EXTRA_SUBJECT, "India VPN Support")
+        }
+        try {
+            startActivity(intent)
+        } catch (_: android.content.ActivityNotFoundException) {
+            Toast.makeText(this, "No email app found — reach us at $email", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun showAbout() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("India VPN")
+            .setMessage("Version ${BuildConfig.VERSION_NAME}\n\nFast, secure and private VPN made for Bharat.")
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    // ---- speed test -------------------------------------------------------------------------------
+
+    private fun setUpSpeedTest() {
+        binding.buttonSpeedBack.setOnClickListener { showTab(Tab.HOME) }
+        binding.cardSpeedServer.setOnClickListener { showTab(Tab.LOCATIONS) }
+        binding.buttonSpeedStart.setOnClickListener {
+            if (speedJob?.isActive == true) speedJob?.cancel() else runSpeedTest()
+        }
+    }
+
+    private fun setGauge(mbps: Double) {
+        binding.speedGauge.setValue(mbps.toFloat())
+        binding.textSpeedValue.text = String.format(Locale.US, "%.1f", mbps)
+    }
+
+    private fun runSpeedTest() {
+        binding.buttonSpeedStart.text = "Stop"
+        binding.textSpeedPing.text = "–"
+        binding.textSpeedDownload.text = "–"
+        binding.textSpeedUpload.text = "–"
+        setGauge(0.0)
+        speedJob = lifecycleScope.launch {
+            try {
+                binding.textSpeedPhase.text = "Checking ping…"
+                val ping = SpeedTest.ping()
+                binding.textSpeedPing.text = ping.toString()
+
+                binding.textSpeedPhase.text = "Testing download…"
+                val down = SpeedTest.download { setGauge(it) }
+                binding.textSpeedDownload.text = String.format(Locale.US, "%.1f", down)
+
+                binding.textSpeedPhase.text = "Testing upload…"
+                val up = SpeedTest.upload { setGauge(it) }
+                binding.textSpeedUpload.text = String.format(Locale.US, "%.1f", up)
+
+                setGauge(down)
+                binding.textSpeedPhase.text = "Done"
+            } catch (e: CancellationException) {
+                binding.textSpeedPhase.text = "Stopped"
+                throw e
+            } catch (e: Exception) {
+                binding.textSpeedPhase.text = "Test failed"
+                Toast.makeText(this@MainActivity, "Speed test failed. Check your internet connection and try again.", Toast.LENGTH_LONG).show()
+            } finally {
+                binding.buttonSpeedStart.text = "Test Again"
+            }
+        }
+    }
+
     companion object {
         /** How often the server list quietly refreshes itself while the app is open. */
         private const val SERVER_REFRESH_INTERVAL_MS = 30_000L
@@ -1156,6 +1319,7 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_TAB = "tab"
         const val TAB_HOME = 0
         const val TAB_LOCATIONS = 1
+        const val TAB_SPEED = 2
         private const val STATE_TAB = "state_tab"
     }
 }

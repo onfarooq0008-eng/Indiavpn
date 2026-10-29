@@ -73,6 +73,17 @@ class BackendApiClient {
         }
     }
 
+    /** The public IP address the backend sees for this device. While the VPN is up this is the
+     *  server's exit IP, which is what the Home screen shows as "IP Address". */
+    suspend fun fetchMyIp(baseUrl: String): String = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url("${baseUrl.trimEnd('/')}/api/myip").get().build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw java.io.IOException("HTTP ${response.code}")
+            val body = response.body?.string() ?: throw java.io.IOException("Empty response")
+            JSONObject(body).getString("ip")
+        }
+    }
+
     suspend fun register(baseUrl: String, devicePublicKeyBase64: String, preferredServerId: String?): BackendRegistration =
         withContext(Dispatchers.IO) {
             val json = JSONObject().apply {

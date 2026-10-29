@@ -4,10 +4,13 @@ This project is your FastVPN Android app + control API, re-skinned as **India VP
 
 | Part | What changed |
 |---|---|
-| Android theme | Navy / saffron / green palette (dark + light) from the Figma design. Power ring, tabs, logo tile and status colors follow it |
-| Branding | App name "India VPN", notification, settings, consent screen, new tricolor launcher icon |
-| Server list | India servers are pinned to the top of the Locations list; other countries stay A-Z |
-| Backend pages | Landing page, privacy, terms, admin dashboard and favicon/share image renamed and recolored |
+| App look | Full UI redesign to the uploaded mockup: blue splash with shield + skyline, blue Home with white power button, green "Connected" screen, light Server List, Speed Test, Settings, side menu. Dark mode is available in Settings |
+| Premium | Hidden everywhere (home crown, side menu, banner). `SHOW_PREMIUM` stays `false` in `app/build.gradle` |
+| Server list | Tabs All / Recommended / Favorites, search, ping colours (green / orange / red). India servers are pinned to the top |
+| Home | "IP Address" and "Location" card. The IP comes from the new backend route `/api/myip`, asked through the tunnel |
+| Speed Test | New screen: ping, download, upload with a live gauge (measured against speed.cloudflare.com) |
+| Settings | Connection (Auto Connect, Protocol, Split Tunneling, DNS), General (Notifications, Language, Dark Mode), Privacy & Security (Kill Switch, Clear Logs), About (Rate, Share, Help, Privacy, Terms) |
+| Backend pages | Landing page, privacy (now mentions IP lookup and Speed Test), terms, admin dashboard, favicon and share image restyled in blue |
 | CI | `.github/workflows/build.yml`: debug APK, signed release APK, signed AAB |
 
 Package id is now **`com.indiavpn.fast`** (namespace and applicationId in `app/build.gradle`, source folders `com/indiavpn/fast`).

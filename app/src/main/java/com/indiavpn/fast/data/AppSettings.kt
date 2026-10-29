@@ -12,6 +12,11 @@ class AppSettings(context: Context) {
         get() = prefs.getBoolean("auto_connect", false)
         set(value) = prefs.edit().putBoolean("auto_connect", value).apply()
 
+    /** Whether the "VPN connected" status notification is shown (Settings -> Notifications). */
+    var notificationsEnabled: Boolean
+        get() = prefs.getBoolean("notifications_enabled", true)
+        set(value) = prefs.edit().putBoolean("notifications_enabled", value).apply()
+
     var lastConnectedServerId: String?
         get() = prefs.getString("last_server_id", null)
         set(value) = prefs.edit().putString("last_server_id", value).apply()
@@ -21,9 +26,9 @@ class AppSettings(context: Context) {
         get() = prefs.getStringSet("favorite_countries", emptySet()) ?: emptySet()
         set(value) = prefs.edit().putStringSet("favorite_countries", value).apply()
 
-    /** "system", "light", or "dark". Changed by the sun/moon button; new installs start in dark. */
+    /** "system", "light", or "dark". Changed by the Dark Mode switch in Settings; new installs start in light. */
     var themeMode: String
-        get() = prefs.getString("theme_mode", "dark") ?: "dark"
+        get() = prefs.getString("theme_mode", "light") ?: "light"
         set(value) = prefs.edit().putString("theme_mode", value).apply()
 
     /** Package names of apps that should bypass the VPN (split tunneling). */

@@ -113,6 +113,7 @@ dependencies {
     implementation 'com.google.android.material:material:1.13.0'
     implementation 'androidx.recyclerview:recyclerview:1.4.0'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.2.0'
+    implementation 'androidx.drawerlayout:drawerlayout:1.2.0'   // side menu (hamburger)
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.11.0'
     // Stable as of 1.1.0 (was pinned to a years-old 1.1.0-alpha06). Note: this
     // release also deprecates EncryptedSharedPreferences/MasterKey in favor of

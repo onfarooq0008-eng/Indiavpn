@@ -14,7 +14,7 @@ import androidx.core.content.ContextCompat
 import com.indiavpn.fast.R
 
 /**
- * Background of the big round power button: soft glow, dark disc and a gradient ring.
+ * Background of the big round power button: soft glow, white (or green when connected) disc and a green gradient ring.
  * Everything is drawn with Canvas primitives (no bitmaps). The power icon and the
  * status texts are ordinary child views layered on top of this view in the layout.
  */
@@ -62,7 +62,7 @@ class PowerRingView @JvmOverloads constructor(
         cx = w / 2f
         cy = h / 2f
         glowRadius = size / 2f
-        ringPaint.strokeWidth = size * 0.055f
+        ringPaint.strokeWidth = size * 0.06f
         ringRadius = size / 2f - size * 0.09f
         discRadius = ringRadius - ringPaint.strokeWidth / 2f
         rebuildShaders()
@@ -71,23 +71,28 @@ class PowerRingView @JvmOverloads constructor(
     private fun rebuildShaders() {
         if (glowRadius <= 0f) return
         val glowColor = when (ringState) {
-            State.CONNECTED -> 0x6600E5A8
-            State.CONNECTING -> 0x552D8CFF
-            State.DISCONNECTED -> 0x221E3A66
+            State.CONNECTED -> 0x5519D98B
+            State.CONNECTING -> 0x44FFFFFF
+            State.DISCONNECTED -> 0x33FFFFFF
         }
         glowPaint.shader = RadialGradient(
             cx, cy, glowRadius,
             intArrayOf(glowColor, glowColor and 0x00FFFFFF),
             floatArrayOf(0.55f, 1f), Shader.TileMode.CLAMP
         )
+        // India VPN look: a white button while off / connecting, a deep green one while connected.
+        val discColors = if (ringState == State.CONNECTED) {
+            intArrayOf(0xFF14A868.toInt(), 0xFF0A6B43.toInt())
+        } else {
+            intArrayOf(0xFFFFFFFF.toInt(), 0xFFE4ECFF.toInt())
+        }
         discPaint.shader = RadialGradient(
-            cx, cy, discRadius,
-            intArrayOf(0xFF111A44.toInt(), 0xFF050A1F.toInt()),
+            cx, cy, discRadius, discColors,
             floatArrayOf(0f, 1f), Shader.TileMode.CLAMP
         )
         val colors = when (ringState) {
-            State.DISCONNECTED -> intArrayOf(0xFF2E3566.toInt(), 0xFF4A5390.toInt(), 0xFF2E3566.toInt())
-            State.CONNECTED -> intArrayOf(color(R.color.ringGreen), 0xFF8FF0B8.toInt(), color(R.color.ringGreen))
+            State.DISCONNECTED -> intArrayOf(0xFF19B25B.toInt(), 0xFF7CE8AE.toInt(), 0xFF19B25B.toInt())
+            State.CONNECTED -> intArrayOf(0xFF2ECC71.toInt(), 0xFFB5F5D2.toInt(), 0xFF2ECC71.toInt())
             else -> intArrayOf(color(R.color.ringCyan), 0xFFFFFFFF.toInt(), color(R.color.ringGreen), color(R.color.ringBlue), color(R.color.ringCyan))
         }
         ringPaint.shader = SweepGradient(cx, cy, colors, null)
@@ -106,7 +111,7 @@ class PowerRingView @JvmOverloads constructor(
 
     private fun drawPulse(canvas: Canvas, t: Float) {
         if (ringState == State.DISCONNECTED || pulseAnimator == null) return
-        val base = if (ringState == State.CONNECTED) color(R.color.ringGreen) else color(R.color.ringBlue)
+        val base = if (ringState == State.CONNECTED) 0xFF2ECC71.toInt() else 0xFFFFFFFF.toInt()
         val alpha = ((1f - t) * 90).toInt().coerceIn(0, 255)
         pulsePaint.strokeWidth = ringPaint.strokeWidth * 0.35f
         pulsePaint.color = (alpha shl 24) or (base and 0x00FFFFFF)

@@ -58,8 +58,22 @@ class SignalBarsView @JvmOverloads constructor(
     companion object {
         private const val BARS = 4
 
-        /** Every server that isn't confirmed offline (-2) shows full green bars, whatever its
-         *  ping -- bars only go dark when the server can't be reached at all. */
-        fun levelForPing(pingMs: Int): Int = if (pingMs == -2) 0 else BARS
+        /** Bars follow the measured ping: green and full up to 100 ms, orange up to 170 ms, red above.
+         *  Not measured yet (-1) or unreachable (-2) shows no lit bars. */
+        fun levelForPing(pingMs: Int): Int = when {
+            pingMs < 0 -> 0
+            pingMs <= 100 -> BARS
+            pingMs <= 170 -> 2
+            else -> 1
+        }
+
+        /** Colour resource for a ping value, shared by the bars and the "xx ms" label. */
+        fun colorForPing(pingMs: Int): Int = when {
+            pingMs == -2 -> R.color.statusOffline
+            pingMs < 0 -> R.color.gray
+            pingMs <= 100 -> R.color.statusOnline
+            pingMs <= 170 -> R.color.statusWarn
+            else -> R.color.statusOffline
+        }
     }
 }

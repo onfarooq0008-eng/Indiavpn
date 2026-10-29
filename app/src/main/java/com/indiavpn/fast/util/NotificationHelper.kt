@@ -29,6 +29,7 @@ object NotificationHelper {
 
     /** Shown while connected -- ongoing (can't be swiped away) with a one-tap Disconnect button. */
     fun showConnected(context: Context, serverLabel: String) {
+        if (!com.indiavpn.fast.data.AppSettings(context).notificationsEnabled) return
         ensureChannel(context)
 
         val openAppIntent = PendingIntent.getActivity(

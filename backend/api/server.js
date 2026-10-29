@@ -607,6 +607,15 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, serverCount: serverStore.loadServers().length });
 });
 
+// The public IP address this request came from. The Android app asks while the VPN is up, so the
+// answer is the VPN server's exit IP, shown as "IP Address" on the Home screen. Nothing is stored or logged.
+app.get('/api/myip', rateLimit(60, 60_000), (req, res) => {
+  const raw = String(req.ip || (req.socket && req.socket.remoteAddress) || '').replace(/^::ffff:/, '');
+  const ip = /^[0-9a-fA-F:.]{3,45}$/.test(raw) ? raw : '';
+  res.set('Cache-Control', 'no-store');
+  res.json({ ip });
+});
+
 // Safety net: catches JSON-parse errors from express.json() and any
 // synchronous throw in a route handler, and guarantees the client never sees
 // a raw Node stack trace regardless of NODE_ENV (setup.sh sets

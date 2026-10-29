@@ -14,13 +14,16 @@ import androidx.core.net.toUri
 import com.indiavpn.fast.BuildConfig
 import com.indiavpn.fast.R
 import com.indiavpn.fast.data.AppSettings
+import com.indiavpn.fast.data.ServerCache
 import com.indiavpn.fast.databinding.ActivitySettingsBinding
 import com.indiavpn.fast.databinding.ViewSettingRowBinding
+import com.indiavpn.fast.util.NotificationHelper
 import com.indiavpn.fast.util.ThemeUtil
 import com.indiavpn.fast.util.applyEdgeToEdgeInsets
 
 /** Regular-user settings only. Server management is handled entirely by the
- *  backend/VPS, so there's no in-app admin surface here. */
+ *  backend/VPS, so there's no in-app admin surface here.
+ *  Sections follow the India VPN design: Connection, General, Privacy & Security, About. */
 class SettingsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySettingsBinding
@@ -34,43 +37,24 @@ class SettingsActivity : AppCompatActivity() {
         settings = AppSettings(this)
 
         binding.buttonSettingsBack.setOnClickListener { finish() }
-        ThemeUtil.bind(binding.buttonThemeSettings)
-        setUpBottomNav()
+        setUpConnection()
         setUpGeneral()
+        setUpPrivacy()
         setUpOther()
     }
 
     override fun onResume() {
         super.onResume()
-        // DNS may have been changed from the dialog; keep the subtitle current.
-        binding.rowDns.rowSubtitle.text = dnsLabel()
-    }
-
-    private fun setUpBottomNav() {
-        binding.bottomNav.selectedItemId = R.id.nav_settings
-        binding.bottomNav.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> { openMain(MainActivity.TAB_HOME); true }
-                R.id.nav_locations -> { openMain(MainActivity.TAB_LOCATIONS); true }
-                else -> true
-            }
-        }
-    }
-
-    private fun openMain(tab: Int) {
-        startActivity(
-            Intent(this, MainActivity::class.java)
-                .putExtra(MainActivity.EXTRA_TAB, tab)
-                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        )
-        finish()
+        // DNS may have been changed from the dialog; keep the value current.
+        binding.rowDns.rowValue.text = dnsLabel()
     }
 
     private fun row(
         b: ViewSettingRowBinding,
         icon: Int,
         title: String,
-        subtitle: String,
+        subtitle: String = "",
+        value: String = "",
         withSwitch: Boolean = false,
         onClick: () -> Unit
     ) {
@@ -78,12 +62,14 @@ class SettingsActivity : AppCompatActivity() {
         b.rowTitle.text = title
         b.rowSubtitle.text = subtitle
         b.rowSubtitle.visibility = if (subtitle.isBlank()) View.GONE else View.VISIBLE
+        b.rowValue.text = value
+        b.rowValue.visibility = if (value.isBlank() || withSwitch) View.GONE else View.VISIBLE
         b.rowSwitch.visibility = if (withSwitch) View.VISIBLE else View.GONE
         b.rowChevron.visibility = if (withSwitch) View.GONE else View.VISIBLE
         b.root.setOnClickListener { onClick() }
     }
 
-    private fun setUpGeneral() {
+    private fun setUpConnection() {
         row(binding.rowAutoConnect, R.drawable.ic_refresh, "Auto Connect", "Connect to last used location", withSwitch = true) {
             binding.rowAutoConnect.rowSwitch.toggle()
         }
@@ -92,7 +78,7 @@ class SettingsActivity : AppCompatActivity() {
             settings.autoConnectEnabled = checked
         }
 
-        row(binding.rowProtocol, R.drawable.ic_protocol, "VPN Protocol", "Auto (Recommended)") {
+        row(binding.rowProtocol, R.drawable.ic_protocol, "Protocol", value = "Auto (Recommended)") {
             AlertDialog.Builder(this)
                 .setTitle("VPN Protocol")
                 .setMessage("India VPN uses WireGuard, a modern, fast and secure protocol, and picks the best settings for you automatically.")
@@ -100,6 +86,42 @@ class SettingsActivity : AppCompatActivity() {
                 .show()
         }
 
+        row(binding.rowSplit, R.drawable.ic_split, "Split Tunneling", "Choose apps to use VPN") {
+            startActivity(Intent(this, SplitTunnelActivity::class.java))
+        }
+
+        row(binding.rowDns, R.drawable.ic_dns, "DNS", value = dnsLabel()) { showDnsDialog() }
+    }
+
+    private fun setUpGeneral() {
+        row(binding.rowNotifications, R.drawable.ic_notifications, "Notifications", "Show a status notification while connected", withSwitch = true) {
+            binding.rowNotifications.rowSwitch.toggle()
+        }
+        binding.rowNotifications.rowSwitch.isChecked = settings.notificationsEnabled
+        binding.rowNotifications.rowSwitch.setOnCheckedChangeListener { _, checked ->
+            settings.notificationsEnabled = checked
+            if (!checked) NotificationHelper.clear(this)
+        }
+
+        row(binding.rowLanguage, R.drawable.ic_globe, "Language", value = "English") {
+            AlertDialog.Builder(this)
+                .setTitle("Language")
+                .setSingleChoiceItems(arrayOf("English"), 0, null)
+                .setPositiveButton("OK", null)
+                .show()
+        }
+
+        row(binding.rowDarkMode, R.drawable.ic_theme_dark, "Dark Mode", withSwitch = true) {
+            binding.rowDarkMode.rowSwitch.toggle()
+        }
+        // Set the state first, then listen -- otherwise setting it would immediately restart the screen.
+        binding.rowDarkMode.rowSwitch.isChecked = ThemeUtil.isNight(this)
+        binding.rowDarkMode.rowSwitch.setOnCheckedChangeListener { _, checked ->
+            ThemeUtil.setDark(this, checked)
+        }
+    }
+
+    private fun setUpPrivacy() {
         // Android only lets the *user* (not the app itself) turn on true lockdown mode
         // ("Block connections without VPN"), so a local toggle here would falsely claim
         // protection. This row deep-links straight to the system VPN settings instead.
@@ -112,11 +134,17 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
-        row(binding.rowSplit, R.drawable.ic_split, "Split Tunneling", "Choose apps to use VPN") {
-            startActivity(Intent(this, SplitTunnelActivity::class.java))
+        row(binding.rowClearLogs, R.drawable.ic_clear_logs, "Clear Logs", "Delete the saved server list and temporary data") {
+            AlertDialog.Builder(this)
+                .setTitle("Clear logs?")
+                .setMessage("This deletes the saved server list and other temporary data stored on this phone. India VPN does not keep a record of your browsing.")
+                .setPositiveButton("Clear") { _, _ ->
+                    ServerCache.clear(this)
+                    Toast.makeText(this, "Cleared", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
         }
-
-        row(binding.rowDns, R.drawable.ic_dns, "DNS", dnsLabel()) { showDnsDialog() }
     }
 
     private fun setUpOther() {
@@ -134,8 +162,8 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(Intent.createChooser(send, "Share India VPN"))
         }
         row(binding.rowHelp, R.drawable.ic_help, "Help & Support", "Get help when you need it") { openContactEmail() }
-        row(binding.rowPrivacy, R.drawable.ic_lock, "Privacy Policy", "") { openInBrowser("$siteBaseUrl/privacy.html") }
-        row(binding.rowTerms, R.drawable.ic_doc, "Terms & Conditions", "") { openInBrowser("$siteBaseUrl/terms.html") }
+        row(binding.rowPrivacy, R.drawable.ic_lock, "Privacy Policy") { openInBrowser("$siteBaseUrl/privacy.html") }
+        row(binding.rowTerms, R.drawable.ic_doc, "Terms & Conditions") { openInBrowser("$siteBaseUrl/terms.html") }
         row(binding.rowAbout, R.drawable.ic_info, "About", "India VPN v${BuildConfig.VERSION_NAME}") {
             AlertDialog.Builder(this)
                 .setTitle("India VPN")
@@ -196,7 +224,7 @@ class SettingsActivity : AppCompatActivity() {
                 } else {
                     settings.dnsMode = mode
                     settings.settingsChangePendingReconnect = true
-                    binding.rowDns.rowSubtitle.text = dnsLabel()
+                    binding.rowDns.rowValue.text = dnsLabel()
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -221,7 +249,7 @@ class SettingsActivity : AppCompatActivity() {
                 settings.customDns = input.text.toString().trim()
                 settings.dnsMode = "custom"
                 settings.settingsChangePendingReconnect = true
-                binding.rowDns.rowSubtitle.text = dnsLabel()
+                binding.rowDns.rowValue.text = dnsLabel()
                 Toast.makeText(this, "Custom DNS saved", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Cancel", null)

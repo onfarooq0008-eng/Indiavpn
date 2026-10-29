@@ -24,9 +24,9 @@
         android:padding="12dp">
         <TextView
             android:id="@+id/textFlag"
-            android:layout_width="40dp"
-            android:layout_height="34dp"
-            android:background="@drawable/bg_flag_tile"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:background="@drawable/bg_flag_circle"
             android:gravity="center"
             android:textSize="20sp"
             tools:text="🇺🇸" />

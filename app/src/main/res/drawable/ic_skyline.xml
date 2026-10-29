@@ -1,0 +1,24 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="360dp" android:height="130dp" android:viewportWidth="360" android:viewportHeight="130">
+    <!-- low buildings -->
+    <path android:fillColor="@color/skyline" android:fillAlpha="0.55" android:pathData="M0,130 L0,104 L26,104 L26,96 L58,96 L58,108 L130,108 L130,130 Z"/>
+    <path android:fillColor="@color/skyline" android:fillAlpha="0.55" android:pathData="M230,130 L230,106 L276,106 L276,100 L330,100 L330,92 L360,92 L360,130 Z"/>
+    <!-- left domed pavilion + minaret -->
+    <path android:fillColor="@color/skyline" android:pathData="M10,130 L10,92 L50,92 L50,130 Z"/>
+    <path android:fillColor="@color/skyline" android:pathData="M14,92 C14,66 46,66 46,92 Z"/>
+    <path android:fillColor="@color/skyline" android:pathData="M29,66 L30,56 L31,66 Z"/>
+    <path android:fillColor="@color/skyline" android:pathData="M60,130 L60,60 L64,48 L68,60 L68,130 Z"/>
+    <path android:fillColor="@color/skyline" android:pathData="M56,76 L72,76 L72,80 L56,80 Z"/>
+    <!-- India Gate with arch cut-out -->
+    <path android:fillColor="@color/skyline" android:fillType="evenOdd" android:pathData="M132,130 L132,46 L228,46 L228,130 Z M160,130 L160,86 C160,62 200,62 200,86 L200,130 Z"/>
+    <path android:fillColor="@color/skyline" android:pathData="M126,46 L234,46 L234,38 L126,38 Z"/>
+    <path android:fillColor="@color/skyline" android:pathData="M150,38 L150,30 L210,30 L210,38 Z"/>
+    <!-- Qutub Minar style tower -->
+    <path android:fillColor="@color/skyline" android:pathData="M262,130 L270,30 L274,24 L278,30 L286,130 Z"/>
+    <path android:fillColor="@color/skyline" android:pathData="M266,62 L290,62 L290,66 L266,66 Z"/>
+    <path android:fillColor="@color/skyline" android:pathData="M264,92 L288,92 L288,96 L264,96 Z"/>
+    <!-- right domes -->
+    <path android:fillColor="@color/skyline" android:pathData="M296,130 L296,96 L346,96 L346,130 Z"/>
+    <path android:fillColor="@color/skyline" android:pathData="M300,96 C300,64 342,64 342,96 Z"/>
+    <path android:fillColor="@color/skyline" android:pathData="M320,64 L321,54 L322,64 Z"/>
+</vector>

@@ -9,7 +9,7 @@
     android:clickable="true"
     android:focusable="true"
     app:cardBackgroundColor="@color/cardBackground"
-    app:cardCornerRadius="20dp"
+    app:cardCornerRadius="16dp"
     app:cardElevation="0dp"
     app:strokeColor="@color/divider"
     app:strokeWidth="1dp">
@@ -17,30 +17,30 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:minHeight="72dp"
+        android:minHeight="68dp"
         android:orientation="horizontal"
         android:paddingStart="14dp"
         android:paddingEnd="6dp"
         android:paddingVertical="10dp">
         <TextView
             android:id="@+id/textFlag"
-            android:layout_width="48dp"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_flag_tile"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_flag_circle"
             android:gravity="center"
             android:textSize="24sp" />
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="14dp"
+            android:layout_marginStart="12dp"
             android:orientation="vertical">
             <TextView
                 android:id="@+id/textCountryName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/textPrimary"
-                android:textSize="17sp"
+                android:textSize="16sp"
                 android:textStyle="bold" />
             <TextView
                 android:id="@+id/textServerCount"
@@ -48,7 +48,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:textColor="@color/gray"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="wrap_content"
@@ -62,20 +62,43 @@
                 android:layout_marginBottom="3dp"
                 android:text="Connected"
                 android:textColor="@color/statusOnline"
-                android:textSize="12sp"
+                android:textSize="11sp"
+                android:textStyle="bold"
                 android:visibility="gone" />
-            <com.indiavpn.fast.ui.SignalBarsView
-                android:id="@+id/signal"
-                android:layout_width="22dp"
-                android:layout_height="16dp" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <com.indiavpn.fast.ui.SignalBarsView
+                    android:id="@+id/signal"
+                    android:layout_width="18dp"
+                    android:layout_height="14dp" />
+                <TextView
+                    android:id="@+id/textPing"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:textColor="@color/gray"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </LinearLayout>
         <ImageButton
             android:id="@+id/buttonFavorite"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="2dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Favorite"
             android:src="@drawable/ic_star_border"
+            app:tint="@color/gray" />
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_marginEnd="8dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_chevron_right"
             app:tint="@color/gray" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

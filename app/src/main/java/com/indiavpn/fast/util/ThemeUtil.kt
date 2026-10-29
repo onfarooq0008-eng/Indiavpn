@@ -12,6 +12,14 @@ object ThemeUtil {
     fun isNight(context: Context): Boolean =
         (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 
+    /** Saves the choice and applies it; AppCompat recreates the visible activities with the new colors. */
+    fun setDark(context: Context, dark: Boolean) {
+        AppSettings(context).themeMode = if (dark) "dark" else "light"
+        AppCompatDelegate.setDefaultNightMode(
+            if (dark) AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO
+        )
+    }
+
     /** Shows a sun while dark (tap -> light) and a moon while light (tap -> dark). */
     fun bind(button: ImageButton) {
         val ctx = button.context

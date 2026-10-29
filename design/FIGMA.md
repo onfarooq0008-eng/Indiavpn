@@ -5,5 +5,5 @@ Figma file (12 screens, 390x844): https://www.figma.com/design/aQuKEMhKXG4dpj0og
 `web-prototype/` is a clickable HTML version of the same screens (open `index.html`). It is a design reference only;
 the real app is the Android project in `app/`.
 
-Palette used in the Android theme (`app/src/main/res/values*/colors.xml`):
-navy #0B1230, saffron #FF9933, orange #FF6A00, green #138808 / #2ECC71.
+The shipped Android UI follows the later mockup (blue hero, white cards, green "connected"), not the first Figma draft.
+Palette lives in `app/src/main/res/values*/colors.xml`: blue #1565F5, deep blue #0A3FB8, green #19B25B / #2ECC71, background #F4F7FD (light) / #0A1226 (dark).

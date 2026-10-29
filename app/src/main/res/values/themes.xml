@@ -10,13 +10,13 @@
         <item name="colorOnSurface">@color/textPrimary</item>
         <item name="android:windowBackground">@color/background</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/cardBackground</item>
         <item name="android:windowLightStatusBar">@bool/light_bars</item>
         <item name="android:fontFamily">sans-serif</item>
     </style>
     <style name="Theme.FastVPN" parent="Theme.FastVPN.Base" />
     <style name="Theme.FastVPN.Splash" parent="Theme.FastVPN">
-        <item name="android:windowBackground">@color/launcherIconBg</item>
+        <item name="android:windowBackground">@drawable/bg_splash</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>
