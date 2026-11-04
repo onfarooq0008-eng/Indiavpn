@@ -191,13 +191,13 @@ jobs:
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee apk-cert.txt
           if grep -qi "Android Debug" apk-cert.txt; then echo "::error::Release APK is signed with the debug key"; exit 1; fi
 
-          jarsigner -verify "$AAB" | tee aab-cert.txt
+          jarsigner -verify "$AAB" > aab-cert.txt 2>&1 || true
           grep -q "jar verified" aab-cert.txt || { echo "::error::AAB is not signed"; exit 1; }
 
           {
             echo "### Signed build ${{ steps.ver.outputs.name }} (versionCode ${{ steps.ver.outputs.code }})"
             echo '```'
-            grep -E "Signer #1 certificate (DN|SHA-256)" apk-cert.txt
+            grep -E "(Signer #1|V[0-9.]+ Signer:) certificate (DN|SHA-256)" apk-cert.txt || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
