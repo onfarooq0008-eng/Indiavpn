@@ -5,6 +5,8 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -30,6 +32,10 @@ object ConnectivityCheckUtil {
 
     private val PROBE_HOSTS = listOf("1.1.1.1", "8.8.8.8")
 
+    // Own scope: a blocking connect cannot be interrupted, and a child of the caller would make the early
+    // return wait for the slower probe anyway.
+    private val probeScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
+
     /**
      * ConnectivityManager doesn't necessarily know about a just-established VPN
      * network the instant GoBackend.setState() returns -- there's a short OS-level
@@ -47,7 +53,7 @@ object ConnectivityCheckUtil {
             }
             if (vpnNetwork != null) return vpnNetwork
             if (System.currentTimeMillis() >= deadline) return null
-            delay(150)
+            delay(100)
         }
     }
 
@@ -55,19 +61,25 @@ object ConnectivityCheckUtil {
         withContext(Dispatchers.IO) {
             try {
                 val vpnNetwork = findVpnNetwork(context) ?: return@withContext false
-                // Two independent probe hosts: one network blocking a single address must not make a
-                // perfectly working server look dead.
-                PROBE_HOSTS.any { host ->
-                    try {
-                        Socket().use { socket ->
-                            vpnNetwork.bindSocket(socket)
-                            socket.connect(InetSocketAddress(host, 443), (timeoutMs / PROBE_HOSTS.size).coerceAtLeast(1_000))
+                // Probe both hosts in parallel and succeed as soon as either answers.
+                val perProbe = (timeoutMs / PROBE_HOSTS.size).coerceAtLeast(1_000)
+                val won = CompletableDeferred<Boolean>()
+                val remaining = java.util.concurrent.atomic.AtomicInteger(PROBE_HOSTS.size)
+                for (host in PROBE_HOSTS) {
+                    probeScope.launch {
+                        val ok = try {
+                            Socket().use { socket ->
+                                vpnNetwork.bindSocket(socket)
+                                socket.connect(InetSocketAddress(host, 443), perProbe)
+                            }
+                            true
+                        } catch (e: Exception) {
+                            false
                         }
-                        true
-                    } catch (e: Exception) {
-                        false
+                        if (ok) won.complete(true) else if (remaining.decrementAndGet() == 0) won.complete(false)
                     }
                 }
+                won.await()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -85,9 +97,9 @@ object ConnectivityCheckUtil {
      */
     suspend fun verifyInternetThroughVpnWithRetries(
         context: Context,
-        totalTimeoutMs: Int = 10_000,
+        totalTimeoutMs: Int = 8_000,
         perAttemptTimeoutMs: Int = 2_000,
-        delayBetweenAttemptsMs: Long = 500
+        delayBetweenAttemptsMs: Long = 250
     ): Boolean = withContext(Dispatchers.IO) {
         val deadline = System.currentTimeMillis() + totalTimeoutMs
         while (System.currentTimeMillis() < deadline) {

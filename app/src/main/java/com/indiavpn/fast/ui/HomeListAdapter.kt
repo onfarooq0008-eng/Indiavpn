@@ -61,12 +61,12 @@ class HomeListAdapter(
         is HomeRow.Header -> {
             val g = row.group
             "H|${g.countryCode}|${g.countryName}|${g.servers.size}|${g.servers.firstOrNull()?.city}|${row.expanded}|" +
-                "${g.bestPingMs()}|${connectedServerId != null && g.servers.any { it.id == connectedServerId }}|" +
+                "${state(g.bestPingMs())}|${connectedServerId != null && g.servers.any { it.id == connectedServerId }}|" +
                 favorites.contains(g.countryCode)
         }
         is HomeRow.ServerRow -> {
             val s = row.server
-            "S|${s.id}|${s.name}|${s.countryName}|${s.city}|${s.pingMs}|${connectedServerId == s.id}"
+            "S|${s.id}|${s.name}|${s.countryName}|${s.city}|${state(s.pingMs)}|${connectedServerId == s.id}"
         }
         is HomeRow.FastestRow -> "F|$fastestSelected"
         is HomeRow.AdRow -> "A|${nativeSlot?.isReady}"
@@ -77,6 +77,13 @@ class HomeListAdapter(
         is HomeRow.ServerRow -> "server_${row.server.id}"
         is HomeRow.FastestRow -> "fastest"
         is HomeRow.AdRow -> "native_ad"
+    }
+
+    /** Rows only show online / offline / checking, so a changed ping value alone must not redraw them. */
+    private fun state(pingMs: Int) = when {
+        pingMs >= 0 -> 1
+        pingMs == -2 -> 2
+        else -> 0
     }
 
     override fun getItemViewType(position: Int): Int = when (items[position]) {
@@ -157,13 +164,13 @@ class HomeListAdapter(
             b.textServerCount.setTextColor(ContextCompat.getColor(ctx, R.color.gray))
             b.textPing.text = when {
                 bestPing == -2 -> "Offline"
-                bestPing >= 0 -> "$bestPing ms"
+                bestPing >= 0 -> "Online"
                 else -> "…"
             }
             b.textPing.setTextColor(ContextCompat.getColor(ctx, SignalBarsView.colorForPing(bestPing)))
 
             b.signal.level = SignalBarsView.levelForPing(bestPing)
-            b.signal.contentDescription = if (bestPing >= 0) "$bestPing ms" else "No signal"
+            b.signal.contentDescription = if (bestPing >= 0) "Online" else "Offline"
             b.textConnected.visibility = if (connected) View.VISIBLE else View.GONE
             connectedStyle(b.root, connected, R.color.cardBackground)
 
@@ -191,7 +198,7 @@ class HomeListAdapter(
                 b.textCity.text = "$where • Offline"
                 b.textCity.setTextColor(ContextCompat.getColor(b.root.context, R.color.statusOffline))
             } else {
-                b.textCity.text = if (server.pingMs >= 0) "$where • ${server.pingMs} ms" else where
+                b.textCity.text = where
                 b.textCity.setTextColor(ContextCompat.getColor(b.root.context, R.color.gray))
             }
             b.signal.level = SignalBarsView.levelForPing(server.pingMs)

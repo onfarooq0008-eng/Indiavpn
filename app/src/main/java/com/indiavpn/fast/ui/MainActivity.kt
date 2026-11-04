@@ -36,6 +36,7 @@ import com.indiavpn.fast.data.ServerSource
 import com.indiavpn.fast.databinding.ActivityMainBinding
 import com.indiavpn.fast.util.ConnectivityCheckUtil
 import com.indiavpn.fast.util.NotificationHelper
+import com.indiavpn.fast.util.IpLookup
 import com.indiavpn.fast.util.PingUtil
 import com.indiavpn.fast.util.SpeedTest
 import com.indiavpn.fast.util.ThemeUtil
@@ -94,7 +95,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var nativeHome: NativeAdSlot
     private lateinit var nativeLocations: NativeAdSlot
     // True while a Connect tap waits for the first ping round (list came from cache, nothing measured yet).
-    private var preparingConnect = false
     // Releasing a backend lease is a network call (up to 15 s). It must never hold up the next
     // failover attempt, so it runs here, independent of the screen's lifecycle.
     private val leaseScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
@@ -105,6 +105,7 @@ class MainActivity : AppCompatActivity() {
     // Public IP shown on Home while connected: null = not looked up yet, "" = lookup failed.
     private var publicIp: String? = null
     private var ipJob: Job? = null
+    private var lastIpAttemptAt = 0L
     private var chromeBg = 0
     private lateinit var drawerBackCallback: OnBackPressedCallback
 
@@ -664,34 +665,7 @@ class MainActivity : AppCompatActivity() {
         if (tunnelManager.state == TunnelState.UP) {
             disconnectFromHome()
         } else {
-            ensurePingedThen { connectToPreferred() }
-        }
-    }
-
-    /** The server list now opens instantly from the cache, so a very fast Connect tap can arrive before
-     *  any server has been pinged. Connecting then would pick an unmeasured (possibly dead) server and
-     *  leave the failover chain empty -- the "stuck on Connecting" case. Measure once first (~1-3 s). */
-    private fun ensurePingedThen(action: () -> Unit) {
-        if (preparingConnect) return
-        if (lastPingAt != 0L || allServers.isEmpty()) {
-            action()
-            return
-        }
-        preparingConnect = true
-        updateStatusCard()
-        updateActionButton()
-        lifecycleScope.launch {
-            try {
-                val results = PingUtil.pingAll(allServers.map { Triple(it.id, it.endpointHost, 22) })
-                allServers.forEach { it.pingMs = results[it.id] ?: -2 }
-                lastPingAt = SystemClock.elapsedRealtime()
-                renderRows()
-            } finally {
-                preparingConnect = false
-                updateStatusCard()
-                updateActionButton()
-            }
-            action()
+            connectToPreferred()
         }
     }
 
@@ -743,14 +717,14 @@ class MainActivity : AppCompatActivity() {
      *  tapped one turns out not to actually pass traffic -- see doConnect(). */
     private fun buildFailoverChain(primary: Server): List<Server> {
         val fallbacks = allServers
-            .filter { it.enabled && it.id != primary.id && it.pingMs >= 0 }
-            .sortedBy { it.pingMs }
+            .filter { it.enabled && it.id != primary.id && it.pingMs != -2 }
+            .sortedBy { if (it.pingMs < 0) Int.MAX_VALUE else it.pingMs }
             .take(2)
         return listOf(primary) + fallbacks
     }
 
     private fun onServerTapped(server: Server) {
-        if (tunnelManager.state == TunnelState.CONNECTING || connectionFlowActive || disconnectInProgress || preparingConnect) return
+        if (tunnelManager.state == TunnelState.CONNECTING || connectionFlowActive || disconnectInProgress) return
         if (tunnelManager.state == TunnelState.UP) {
             if (connectedServer?.id == server.id) {
                 // Tapping the server you're already on disconnects.
@@ -914,12 +888,17 @@ class MainActivity : AppCompatActivity() {
                 connectionFlowActive = false
                 pendingChain = null
                 connectedServer = server
+                // New connection = new exit IP: forget the old one so Home fetches it again right away.
+                publicIp = null
+                lastIpAttemptAt = 0L
+                ipJob?.cancel()
                 appSettings.lastConnectedServerId = server.id
                 // This connect already used the current DNS / split-tunnel settings, so any earlier
                 // pending-reconnect flag is moot -- clear it to avoid a needless follow-up reconnect.
                 appSettings.settingsChangePendingReconnect = false
                 updateStatusCard()
                 updateActionButton()
+                updateIpInfo()
                 startConnectionStats()
                 renderRows()
                 NotificationHelper.showConnected(this@MainActivity, "${server.flagEmoji()} ${server.name}")
@@ -973,10 +952,10 @@ class MainActivity : AppCompatActivity() {
         // If the VPN is down, no registration lease should remain active.
         val (active, pending) = withContext(Dispatchers.IO) { keyStore.activeRegistration() to keyStore.pendingRegistrations() }
         // A Connect tap can start while this runs; its brand-new lease would be released under it.
-        if (connectionFlowActive || preparingConnect) return
+        if (connectionFlowActive) return
         active?.let { releaseRegistrationLease(it.serverId, it.token) }
         for (lease in pending) {
-            if (connectionFlowActive || preparingConnect) return
+            if (connectionFlowActive) return
             releaseRegistrationLease(lease.serverId, lease.token)
         }
     }
@@ -1016,7 +995,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun uiState(): UiState = when {
-        tunnelManager.state == TunnelState.CONNECTING || connectionFlowActive || preparingConnect -> UiState.CONNECTING
+        tunnelManager.state == TunnelState.CONNECTING || connectionFlowActive -> UiState.CONNECTING
         tunnelManager.state == TunnelState.UP -> UiState.CONNECTED
         else -> UiState.DISCONNECTED
     }
@@ -1083,6 +1062,7 @@ class MainActivity : AppCompatActivity() {
             ipJob?.cancel()
             ipJob = null
             publicIp = null
+            lastIpAttemptAt = 0L
             binding.textIpAddress.text = "Not connected"
             binding.textLocation.text = "Not connected"
             return
@@ -1095,17 +1075,20 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (ipJob?.isActive == true) return
+        // A failed lookup is retried, but not on every UI refresh.
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastIpAttemptAt < 4_000L && lastIpAttemptAt != 0L) return
+        lastIpAttemptAt = now
         binding.textIpAddress.text = "Checking…"
         ipJob = lifecycleScope.launch {
-            val result = try {
-                BackendApiClient().fetchMyIp(appSettings.backendApiUrl)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                ""
+            val found = IpLookup.find(backendIp = { BackendApiClient().fetchMyIp(appSettings.backendApiUrl) })
+            if (found != null) {
+                publicIp = found
+                binding.textIpAddress.text = found
+            } else {
+                // Never cache a failure: leave publicIp unset so the next refresh tries again.
+                binding.textIpAddress.text = "Unavailable"
             }
-            publicIp = result
-            binding.textIpAddress.text = result.ifBlank { "Unavailable" }
         }
     }
 

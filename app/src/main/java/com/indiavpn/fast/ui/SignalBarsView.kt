@@ -9,7 +9,7 @@ import android.view.View
 import androidx.core.content.ContextCompat
 import com.indiavpn.fast.R
 
-/** Four ascending bars, 0..4 lit. Used for the ping quality of a server. */
+/** Four ascending bars: all green when the server is online, none lit when offline. */
 class SignalBarsView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
@@ -39,11 +39,7 @@ class SignalBarsView @JvmOverloads constructor(
         val barW = (width - gap * (BARS - 1)) / BARS
         val onColor = ContextCompat.getColor(
             context,
-            when {
-                level >= 3 -> R.color.statusOnline
-                level == 2 -> R.color.statusWarn
-                else -> R.color.statusOffline
-            }
+            if (level > 0) R.color.statusOnline else R.color.statusOffline
         )
         val offColor = ContextCompat.getColor(context, R.color.signalOff)
         for (i in 0 until BARS) {
@@ -58,22 +54,15 @@ class SignalBarsView @JvmOverloads constructor(
     companion object {
         private const val BARS = 4
 
-        /** Bars follow the measured ping: green and full up to 100 ms, orange up to 170 ms, red above.
-         *  Not measured yet (-1) or unreachable (-2) shows no lit bars. */
-        fun levelForPing(pingMs: Int): Int = when {
-            pingMs < 0 -> 0
-            pingMs <= 100 -> BARS
-            pingMs <= 170 -> 2
-            else -> 1
-        }
+        /** Online servers always show full green bars; the real ping is never displayed.
+         *  Offline (-2) and not-checked-yet (-1) light nothing. */
+        fun levelForPing(pingMs: Int): Int = if (pingMs >= 0) BARS else 0
 
-        /** Colour resource for a ping value, shared by the bars and the "xx ms" label. */
+        /** Green when online, red when offline, grey while the first check is still running. */
         fun colorForPing(pingMs: Int): Int = when {
+            pingMs >= 0 -> R.color.statusOnline
             pingMs == -2 -> R.color.statusOffline
-            pingMs < 0 -> R.color.gray
-            pingMs <= 100 -> R.color.statusOnline
-            pingMs <= 170 -> R.color.statusWarn
-            else -> R.color.statusOffline
+            else -> R.color.gray
         }
     }
 }
