@@ -49,6 +49,8 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -558,9 +560,9 @@ class MainActivity : AppCompatActivity() {
                 if (ping) {
                     // Show each server's status the moment its check finishes instead of waiting for the slowest.
                     var lastRenderAt = 0L
-                    kotlinx.coroutines.coroutineScope {
+                    coroutineScope {
                         servers.map { s ->
-                            kotlinx.coroutines.async {
+                            async {
                                 s.pingMs = PingUtil.pingHost(s.endpointHost, 22)
                                 val now = SystemClock.elapsedRealtime()
                                 if (now - lastRenderAt > 250L) {
