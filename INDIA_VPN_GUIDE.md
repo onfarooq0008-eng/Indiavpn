@@ -5,7 +5,7 @@ This project is your FastVPN Android app + control API, re-skinned as **India VP
 | Part | What changed |
 |---|---|
 | App look | Full UI redesign to the uploaded mockup: blue splash with shield + skyline, blue Home with white power button, green "Connected" screen, light Server List, Speed Test, Settings, side menu. Dark mode is available in Settings |
-| Premium | Hidden everywhere (home crown, side menu, banner). `SHOW_PREMIUM` stays `false` in `app/build.gradle` |
+| Premium | Hidden everywhere (home crown, side menu). `SHOW_PREMIUM` stays `false` in `app/build.gradle` |
 | Server list | Tabs All / Recommended / Favorites, search, ping colours (green / orange / red). India servers are pinned to the top |
 | Home | "IP Address" and "Location" card. The IP comes from the new backend route `/api/myip`, asked through the tunnel |
 | Speed Test | New screen: ping, download, upload with a live gauge (measured against speed.cloudflare.com) |
@@ -19,7 +19,7 @@ Still unchanged: backend URL `https://api.fastvpnn.pp.ua` (`DEFAULT_BACKEND_API_
 Because the package id is new, this is a **new app** for Google Play and for Yandex Ads:
 
 - Create a new app in Play Console with id `com.indiavpn.fast`. It cannot update an old `com.fastvpnn.app` listing.
-- In the Yandex Partner dashboard, add the app `com.indiavpn.fast` and create its banner, native and interstitial units, then put the new
+- In the Yandex Partner dashboard, add the app `com.indiavpn.fast` and create its native and interstitial units, then put the new
   IDs in `app/src/main/java/com/indiavpn/fast/ads/AdConfig.kt`. The current IDs belong to the old app and may not fill for the new one.
 - The Play button on the landing page already points to `id=com.indiavpn.fast`; it shows "Coming soon" until the listing is live.
 - Users of an older `com.fastvpnn.app` install would need to install India VPN as a separate app.
@@ -57,8 +57,8 @@ In GitHub: **Settings > Secrets and variables > Actions > New repository secret*
 | `RELEASE_KEY_ALIAS` | `indiavpn` (the alias you used) |
 | `RELEASE_KEY_PASSWORD` | key password |
 
-Optional variable `VERSION_CODE_BASE` (Variables tab): versionCode = base + run number. Default base is 100.
-Set it above the highest versionCode you already uploaded to Play.
+The app version is set in `app/build.gradle` (currently 1.0.0, versionCode 1). For your next Play upload raise both there.
+Optional variable `VERSION_CODE_BASE` (Variables tab): if set, CI uses versionCode = base + run number instead.
 
 ## 3. Build
 

@@ -41,10 +41,10 @@ class BackendApiClient {
         // + TLS + body), which the per-phase timeouts alone do not.
         val client: OkHttpClient by lazy {
             OkHttpClient.Builder()
-                .connectTimeout(8, TimeUnit.SECONDS)
-                .readTimeout(8, TimeUnit.SECONDS)
-                .writeTimeout(8, TimeUnit.SECONDS)
-                .callTimeout(15, TimeUnit.SECONDS)
+                .connectTimeout(5, TimeUnit.SECONDS)
+                .readTimeout(6, TimeUnit.SECONDS)
+                .writeTimeout(6, TimeUnit.SECONDS)
+                .callTimeout(10, TimeUnit.SECONDS)
                 .build()
         }
     }

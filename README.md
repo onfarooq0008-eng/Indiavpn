@@ -11,7 +11,7 @@ yourself, with:
 - **Automatic device registration** via a backend API baked into the app
   itself — every user who installs the app gets your servers automatically,
   zero setup on their end. See `/backend`.
-- **100% free, ad-supported** — no paywall, ads served only by Yandex Ads (banner, native, disconnect interstitial)
+- **100% free, ad-supported** — no paywall, ads served only by Yandex Ads (native cards and a disconnect interstitial on every 3rd disconnect — no banner)
 - **Search**, **dark mode**, **split tunneling**, a **connection timer + data
   usage** counter, and a **persistent notification with a one-tap Disconnect
   button** while connected
@@ -82,13 +82,12 @@ of the app uses it automatically, no per-device setup needed by anyone.
 ## 4. Ads (Yandex Mobile Ads only)
 
 Served by the **plain Yandex Mobile Ads SDK 8** (`com.yandex.android:mobileads`) -- the only ad SDK in the app: no mediation bundle,
-no AdMob, no Start.io, no Unity, no other network. Formats: a **banner** above the bottom navigation bar, a **native** ad card on the
+no AdMob, no Start.io, no Unity, no other network. Formats: a **native** ad card on the
 Home screen and another inside the Locations list (after the first two countries), and an **interstitial** shown right after the user
-taps Disconnect, and only gently: never on the first 2 disconnects, then every other one, at least 5 minutes apart and at most
-4 a day (numbers in `AdConfig.kt`). No rewarded ads.
+taps Disconnect, on every 3rd disconnect (the number is `INTERSTITIAL_EVERY_N_DISCONNECTS` in `AdConfig.kt`). No rewarded ads.
 
-1. Ad unit IDs live in `app/src/main/java/com/indiavpn/fast/ads/AdConfig.kt` (banner `R-M-20279211-1`, native `R-M-20279211-2`,
-   interstitial `R-M-20279211-3`).
+1. Ad unit IDs live in `app/src/main/java/com/indiavpn/fast/ads/AdConfig.kt` (native `R-M-20337113-1`,
+   interstitial `R-M-20337113-2`).
 2. Debug builds always use Yandex's demo ads. To ship a release that shows only demo ads, set `USE_TEST_ADS` to `"true"`
    in the release block of `app/build.gradle`.
 3. There is no separate ads pop-up. The first-launch Terms screen (`ConsentActivity`, text in `strings.xml` `consent_body`) says the app
@@ -133,7 +132,7 @@ Tell me when you're ready and I'll write the exact Caddy config for your domain.
 
 ## 6. Monetization
 
-No paywall, no subscriptions — every server is free, and the only ad is one banner (Yandex Ads).
+No paywall, no subscriptions — every server is free, and ads are Yandex native cards and an occasional disconnect interstitial.
 
 ---
 

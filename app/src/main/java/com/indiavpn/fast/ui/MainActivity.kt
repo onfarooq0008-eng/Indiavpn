@@ -105,7 +105,9 @@ class MainActivity : AppCompatActivity() {
     // Public IP shown on Home while connected: null = not looked up yet, "" = lookup failed.
     private var publicIp: String? = null
     private var ipJob: Job? = null
+    private var connectJob: Job? = null // the running connect / server-switch, so Cancel can stop it
     private var lastIpAttemptAt = 0L
+    private var ipRetries = 0
     private var chromeBg = 0
     private lateinit var drawerBackCallback: OnBackPressedCallback
 
@@ -212,7 +214,6 @@ class MainActivity : AppCompatActivity() {
 
         // Idempotent: first-run users reach here without FastVpnApp having started ads yet.
         AdsManager.init(application)
-        AdsManager.showBanner(this, binding.adContainer)
         // Native ads start loading once the SDK is up.
         nativeHome.start()
         nativeLocations.start()
@@ -355,7 +356,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        AdsManager.hideBanner(binding.adContainer)
         nativeHome.destroy()
         nativeLocations.destroy()
         speedJob?.cancel()
@@ -444,7 +444,14 @@ class MainActivity : AppCompatActivity() {
         binding.nativeHomeContainer.visibility = if (nativeHome.isReady) View.VISIBLE else View.GONE
     }
 
-    private suspend fun disconnectTunnel(failureMessage: String, showAd: Boolean = false): Boolean {
+    private suspend fun disconnectTunnel(
+        failureMessage: String,
+        showAd: Boolean = false,
+        waitForLeaseRelease: Boolean = true
+    ): Boolean {
+        // Read the lease that belongs to THIS tunnel now, so a slow background release can never hit the
+        // lease of the connection that is about to replace it.
+        val oldLease = if (waitForLeaseRelease) null else withContext(Dispatchers.IO) { keyStore.activeRegistration() }
         val result = tunnelManager.disconnect()
         if (result.isFailure) {
             tunnelManager.syncStateFromBackend()
@@ -458,7 +465,12 @@ class MainActivity : AppCompatActivity() {
         onDisconnected() // UI first -- releasing the backend lease below can take a network round trip
         // The user tapped Disconnect themselves: this is the moment for the interstitial (rate-limited inside AdsManager).
         if (showAd) AdsManager.showInterstitial(this)
-        releaseActiveRegistrationLease()
+        if (waitForLeaseRelease) {
+            releaseActiveRegistrationLease()
+        } else {
+            // Switching servers: don't make the user wait for a network round trip before connecting.
+            oldLease?.let { releaseLeaseInBackground(it.serverId, it.token) }
+        }
         return true
     }
 
@@ -544,9 +556,20 @@ class MainActivity : AppCompatActivity() {
                 // Pinging every server costs battery and data, so the quiet background tick only does
                 // it while the Locations list is actually on screen (see startServerAutoRefresh).
                 if (ping) {
-                    val targets = servers.map { Triple(it.id, it.endpointHost, 22) }
-                    val results = PingUtil.pingAll(targets)
-                    servers.forEach { it.pingMs = results[it.id] ?: -2 }
+                    // Show each server's status the moment its check finishes instead of waiting for the slowest.
+                    var lastRenderAt = 0L
+                    kotlinx.coroutines.coroutineScope {
+                        servers.map { s ->
+                            kotlinx.coroutines.async {
+                                s.pingMs = PingUtil.pingHost(s.endpointHost, 22)
+                                val now = SystemClock.elapsedRealtime()
+                                if (now - lastRenderAt > 250L) {
+                                    lastRenderAt = now
+                                    renderRows()
+                                }
+                            }
+                        }.forEach { it.await() }
+                    }
                     lastPingAt = SystemClock.elapsedRealtime()
                     renderRows()
                 }
@@ -662,10 +685,36 @@ class MainActivity : AppCompatActivity() {
 
     private fun onActionButtonTapped() {
         if (disconnectInProgress) return
+        if (uiState() == UiState.CONNECTING) {
+            cancelConnection()
+            return
+        }
         if (tunnelManager.state == TunnelState.UP) {
             disconnectFromHome()
         } else {
             connectToPreferred()
+        }
+    }
+
+    /** Stops a connect or server switch that is taking too long. Whatever was half-built is torn down (the
+     *  cancelled connect job removes its own tunnel and backend lease), and the UI goes back to Disconnected. */
+    private fun cancelConnection() {
+        connectJob?.cancel()
+        connectJob = null
+        connectionFlowActive = false
+        pendingChain = null
+        connectingServer = null
+        disconnectInProgress = true
+        updateActionButton()
+        lifecycleScope.launch {
+            try {
+                // Waits for any connect step still in flight, then makes sure nothing is left running.
+                withContext(NonCancellable) { tunnelManager.disconnect() }
+                onDisconnected()
+            } finally {
+                disconnectInProgress = false
+                updateActionButton()
+            }
         }
     }
 
@@ -724,7 +773,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onServerTapped(server: Server) {
-        if (tunnelManager.state == TunnelState.CONNECTING || connectionFlowActive || disconnectInProgress) return
+        if (tunnelManager.state == TunnelState.CONNECTING || connectionFlowActive || disconnectInProgress) {
+            if (!disconnectInProgress) Toast.makeText(this, "Still connecting… tap Cancel to stop", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (tunnelManager.state == TunnelState.UP) {
             if (connectedServer?.id == server.id) {
                 // Tapping the server you're already on disconnects.
@@ -735,8 +787,8 @@ class MainActivity : AppCompatActivity() {
                 connectionFlowActive = true
                 updateStatusCard()
                 updateActionButton()
-                lifecycleScope.launch {
-                    if (!disconnectTunnel("Could not switch server")) {
+                connectJob = lifecycleScope.launch {
+                    if (!disconnectTunnel("Could not switch server", waitForLeaseRelease = false)) {
                         connectionFlowActive = false
                         updateStatusCard()
                         updateActionButton()
@@ -836,7 +888,7 @@ class MainActivity : AppCompatActivity() {
         val server = chain[attemptIndex]
         connectingServer = server
         updateStatusCard()
-        lifecycleScope.launch {
+        connectJob = lifecycleScope.launch {
             var registration: Registration? = null
             try {
                 val privateKey = withContext(Dispatchers.IO) { keyStore.clientPrivateKeyBase64() }
@@ -891,6 +943,7 @@ class MainActivity : AppCompatActivity() {
                 // New connection = new exit IP: forget the old one so Home fetches it again right away.
                 publicIp = null
                 lastIpAttemptAt = 0L
+                ipRetries = 0
                 ipJob?.cancel()
                 appSettings.lastConnectedServerId = server.id
                 // This connect already used the current DNS / split-tunnel settings, so any earlier
@@ -1010,6 +1063,7 @@ class MainActivity : AppCompatActivity() {
                 binding.imagePower.imageTintList = ColorStateList.valueOf(white)
                 binding.textRingStatus.text = "Connected"
                 binding.textProtected.text = "Your online privacy is protected"
+                binding.buttonDisconnect.text = "Disconnect"
                 binding.buttonDisconnect.visibility = View.VISIBLE
             }
             UiState.CONNECTING -> {
@@ -1018,7 +1072,9 @@ class MainActivity : AppCompatActivity() {
                 binding.imagePower.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.ringBlue))
                 binding.textRingStatus.text = "Connecting…"
                 binding.textProtected.text = "Securing your connection…"
-                binding.buttonDisconnect.visibility = View.GONE
+                binding.buttonDisconnect.text = "Cancel"
+                binding.buttonDisconnect.visibility = View.VISIBLE
+                stopConnectionStats()
             }
             UiState.DISCONNECTED -> {
                 binding.ringView.ringState = PowerRingView.State.DISCONNECTED
@@ -1027,6 +1083,7 @@ class MainActivity : AppCompatActivity() {
                 binding.textRingStatus.text = "Tap to Connect"
                 binding.textProtected.text = "Your online privacy is not protected"
                 binding.buttonDisconnect.visibility = View.GONE
+                stopConnectionStats()
             }
         }
         applyChrome()
@@ -1063,6 +1120,7 @@ class MainActivity : AppCompatActivity() {
             ipJob = null
             publicIp = null
             lastIpAttemptAt = 0L
+            ipRetries = 0
             binding.textIpAddress.text = "Not connected"
             binding.textLocation.text = "Not connected"
             return
@@ -1084,10 +1142,21 @@ class MainActivity : AppCompatActivity() {
             val found = IpLookup.find(backendIp = { BackendApiClient().fetchMyIp(appSettings.backendApiUrl) })
             if (found != null) {
                 publicIp = found
+                ipRetries = 0
                 binding.textIpAddress.text = found
             } else {
-                // Never cache a failure: leave publicIp unset so the next refresh tries again.
+                // Never cache a failure: leave publicIp unset, and try again a few times on our own
+                // (the tunnel can take a moment to start routing) instead of waiting for a UI refresh.
                 binding.textIpAddress.text = "Unavailable"
+                if (ipRetries < 5) {
+                    ipRetries++
+                    delay(5_000)
+                    if (uiState() == UiState.CONNECTED && publicIp == null) {
+                        lastIpAttemptAt = 0L
+                        ipJob = null // this coroutine is finishing; let the next attempt start
+                        updateIpInfo()
+                    }
+                }
             }
         }
     }
@@ -1127,19 +1196,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateActionButton() {
-        val busy = uiState() == UiState.CONNECTING || disconnectInProgress
+        // While connecting the buttons stay enabled: they act as Cancel.
+        val busy = disconnectInProgress
         binding.powerButton.isEnabled = !busy
         binding.buttonDisconnect.isEnabled = !busy
         binding.powerButton.contentDescription =
-            if (tunnelManager.state == TunnelState.UP) "Disconnect" else "Connect"
+            when {
+                uiState() == UiState.CONNECTING -> "Cancel"
+                tunnelManager.state == TunnelState.UP -> "Disconnect"
+                else -> "Connect"
+            }
         updateStatusCard()
     }
 
     private fun startConnectionStats() {
         binding.layoutConnectionStats.visibility = View.VISIBLE
         binding.chronometerConnected.visibility = View.VISIBLE
-        binding.chronometerConnected.text = "00:00:00"
-        binding.chronometerConnected.base = SystemClock.elapsedRealtime()
+        if (connectedSince == 0L) connectedSince = SystemClock.elapsedRealtime()
+        binding.chronometerConnected.base = connectedSince
         binding.chronometerConnected.start()
         startStatsPolling()
     }
@@ -1169,6 +1243,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopConnectionStats() {
+        connectedSince = 0L
         binding.chronometerConnected.stop()
         binding.chronometerConnected.visibility = View.GONE
         binding.layoutConnectionStats.visibility = View.GONE
@@ -1295,6 +1370,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
+        /** SystemClock.elapsedRealtime() when the current VPN connection became active; 0 when not connected.
+         *  Kept here (not in the Activity) so the timer keeps the real time when the screen is recreated. */
+        @Volatile private var connectedSince = 0L
+
         /** How often the server list quietly refreshes itself while the app is open. */
         private const val SERVER_REFRESH_INTERVAL_MS = 30_000L
 

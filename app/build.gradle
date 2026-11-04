@@ -13,10 +13,11 @@ if (hasSigningConfig) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
-// CI passes -PappVersionCode / -PappVersionName (see .github/workflows/build.yml) so every
-// Play upload gets a higher versionCode. Local builds fall back to the defaults below.
-def appVersionCode = (project.findProperty('appVersionCode') ?: '5').toString().toInteger()
-def appVersionName = (project.findProperty('appVersionName') ?: '1.0.5').toString()
+// Version shown in the app: 1.0.0, versionCode 1. To ship an update, raise both defaults below
+// (Play needs a higher versionCode for every upload). CI only overrides them if you set the
+// VERSION_CODE_BASE variable (see .github/workflows/build.yml).
+def appVersionCode = (project.findProperty('appVersionCode') ?: '1').toString().toInteger()
+def appVersionName = (project.findProperty('appVersionName') ?: '1.0.0').toString()
 
 android {
     namespace 'com.indiavpn.fast'
@@ -74,7 +75,7 @@ android {
             }
         }
         debug {
-            // Debug builds ALWAYS use the Yandex demo banner.
+            // Debug builds ALWAYS use the Yandex demo ads (they earn nothing).
             buildConfigField "boolean", "USE_TEST_ADS", "true"
         }
     }

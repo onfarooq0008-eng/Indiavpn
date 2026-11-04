@@ -82,7 +82,7 @@ jobs:
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
       - name: Build debug APK
-        run: gradle assembleDebug -PappVersionCode=${{ github.run_number }}
+        run: gradle assembleDebug
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:
@@ -140,16 +140,23 @@ jobs:
         id: ver
         env:
           # Optional repo variable (Settings > Secrets and variables > Actions > Variables).
-          # versionCode = base + run number, so every Play upload is higher than the last one.
+          # Leave this unset to use the version in app/build.gradle exactly (1.0.0, code 1).
+          # If set, versionCode = base + run number, so every upload is higher than the last one.
           VERSION_CODE_BASE: ${{ vars.VERSION_CODE_BASE }}
         run: |
-          CODE=$(( ${VERSION_CODE_BASE:-100} + GITHUB_RUN_NUMBER ))
-          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          DEFAULT_CODE="$(sed -n "s/.*findProperty('appVersionCode') ?: '\([^']*\)'.*/\1/p" app/build.gradle | head -1)"
+          DEFAULT_NAME="$(sed -n "s/.*findProperty('appVersionName') ?: '\([^']*\)'.*/\1/p" app/build.gradle | head -1)"
+          if [ -n "$VERSION_CODE_BASE" ]; then
+            CODE=$(( VERSION_CODE_BASE + GITHUB_RUN_NUMBER ))
+            NAME="${DEFAULT_NAME}-build${GITHUB_RUN_NUMBER}"
+          else
+            CODE="$DEFAULT_CODE"   # exactly what app/build.gradle says (currently 1 / 1.0.0)
+            NAME="$DEFAULT_NAME"
+          fi
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             NAME="${GITHUB_REF_NAME#v}"
-          else
-            NAME="$(sed -n "s/.*findProperty('appVersionName') ?: '\([^']*\)'.*/\1/p" app/build.gradle | head -1)-build${GITHUB_RUN_NUMBER}"
           fi
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "Version: $NAME ($CODE)"
 

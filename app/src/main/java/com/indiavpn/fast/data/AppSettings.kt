@@ -106,25 +106,10 @@ class AppSettings(context: Context) {
         get() = prefs.getBoolean("ads_accepted_v1", false)
         set(value) = prefs.edit().putBoolean("ads_accepted_v1", value).apply()
 
-    // ---- disconnect-interstitial frequency cap (see AdsManager.showInterstitial / AdConfig) ----
-    /** How many user-initiated disconnects have happened since install. */
+    // ---- how many times the user has disconnected (every 3rd shows the interstitial, see AdsManager) ----
     var interstitialDisconnects: Int
         get() = prefs.getInt("interstitial_disconnects", 0)
         set(value) = prefs.edit().putInt("interstitial_disconnects", value).apply()
-
-    /** Wall-clock time (ms) the last disconnect interstitial was shown; 0 = never. */
-    var interstitialLastShownMs: Long
-        get() = prefs.getLong("interstitial_last_shown", 0L)
-        set(value) = prefs.edit().putLong("interstitial_last_shown", value).apply()
-
-    /** Day number (days since 1970) that [interstitialShownToday] belongs to. */
-    var interstitialDay: Long
-        get() = prefs.getLong("interstitial_day", 0L)
-        set(value) = prefs.edit().putLong("interstitial_day", value).apply()
-
-    var interstitialShownToday: Int
-        get() = prefs.getInt("interstitial_shown_today", 0)
-        set(value) = prefs.edit().putInt("interstitial_shown_today", value).apply()
 
     /** Whether the user has accepted the Privacy Policy / Terms on the consent
      *  screen shown before first use. Gates access to MainActivity. */

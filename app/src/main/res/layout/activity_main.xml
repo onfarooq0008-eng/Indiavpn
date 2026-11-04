@@ -671,14 +671,6 @@
             </ScrollView>
         </FrameLayout>
 
-        <FrameLayout
-            android:id="@+id/adContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="60dp"
-            android:paddingVertical="4dp"
-            android:visibility="gone" />
-
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNav"
             android:layout_width="match_parent"
